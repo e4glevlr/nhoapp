@@ -3,6 +3,9 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:camera/camera.dart';
+import 'package:http_parser/http_parser.dart'; // added import for http_parser
 
 class VoiceChatPage extends StatefulWidget {
   const VoiceChatPage({super.key});
@@ -17,6 +20,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   bool _isListening = false;
   String _currentText = '';
   List<_Message> _messages = [];
+  CameraController? _cameraController;
 
   final String userId = "user123";
   final String sessionId = "session123";
@@ -26,6 +30,27 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
     super.initState();
     _tts.setLanguage("vi-VN");
     _tts.setSpeechRate(0.9);
+    _requestCameraPermission();
+  }
+
+  Future<void> _requestCameraPermission() async {
+    final status = await Permission.camera.request();
+    if (status.isGranted) {
+      _initializeCamera();
+    } else {
+      // Optionally, handle the case where permission is not granted
+    }
+  }
+
+  Future<void> _initializeCamera() async {
+    final cameras = await availableCameras();
+    final frontCamera = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => cameras.first,
+    );
+    _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
+    await _cameraController!.initialize();
+    setState(() {});
   }
 
   Future<void> _startListening() async {
@@ -47,33 +72,39 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
 
     if (_currentText.isNotEmpty) {
       _addMessage(_currentText, isUser: true);
-      await _sendToBot(_currentText);
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        final image = await _cameraController!.takePicture();
+        await _sendToBot(_currentText, imageFile: image);
+      } else {
+        await _sendToBot(_currentText);
+      }
       _currentText = '';
     }
   }
 
-  Future<void> _sendToBot(String inputText) async {
-    final url = Uri.parse("https://aitools.ptit.edu.vn/nho/chat");
-
-    final body = {
-      "user_id": userId,
-      "session_id": sessionId,
-      "text": inputText,
-    };
+  Future<void> _sendToBot(String inputText, {XFile? imageFile}) async {
+    final uri = Uri.parse("https://aitools.ptit.edu.vn/nho/analyze-image");
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['user_id'] = userId;
+    request.fields['session_id'] = sessionId;
+    request.fields['text'] = inputText;
+    if (imageFile != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          imageFile.path,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    }
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        },
-        body: body,
-      );
-
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse =
-        jsonDecode(utf8.decode(response.bodyBytes));
-
+        final Map<String, dynamic> jsonResponse = jsonDecode(
+          utf8.decode(response.bodyBytes),
+        );
         String botReply = '';
         if (jsonResponse.containsKey('response')) {
           try {
@@ -83,7 +114,6 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
             botReply = jsonResponse['response'];
           }
         }
-
         _addMessage(botReply, isUser: false);
         await _tts.speak(botReply);
       } else {
@@ -113,10 +143,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
           color: color,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          msg.text,
-          style: const TextStyle(fontSize: 16),
-        ),
+        child: Text(msg.text, style: const TextStyle(fontSize: 16)),
       ),
     );
   }
@@ -131,9 +158,10 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
           height: 60,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: _isListening
-                  ? [Colors.redAccent, Colors.red]
-                  : [Colors.blueAccent, Colors.blue],
+              colors:
+                  _isListening
+                      ? [Colors.redAccent, Colors.red]
+                      : [Colors.blueAccent, Colors.blue],
             ),
             borderRadius: BorderRadius.circular(30),
             boxShadow: const [
@@ -141,7 +169,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
                 color: Colors.black26,
                 offset: Offset(0, 4),
                 blurRadius: 6,
-              )
+              ),
             ],
           ),
           child: Row(
@@ -173,6 +201,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   void dispose() {
     _speech.stop();
     _tts.stop();
+    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -180,21 +209,32 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("🎙️ Voice Chat Bot")),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) => _buildMessage(_messages[index]),
-            ),
+          if (_cameraController != null &&
+              _cameraController!.value.isInitialized)
+            SizedBox.expand(child: CameraPreview(_cameraController!)),
+          Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: _messages.length,
+                  itemBuilder:
+                      (context, index) => _buildMessage(_messages[index]),
+                ),
+              ),
+              if (_isListening)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    "🎤 Đang nghe...",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              _buildMicButton(),
+            ],
           ),
-          if (_isListening)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text("🎤 Đang nghe...", style: TextStyle(color: Colors.red)),
-            ),
-          _buildMicButton(),
         ],
       ),
     );
