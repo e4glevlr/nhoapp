@@ -21,6 +21,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   String _currentText = '';
   List<_Message> _messages = [];
   CameraController? _cameraController;
+  List<CameraDescription> _cameras = []; // new state variable to cache cameras
 
   final String userId = "user123";
   final String sessionId = "session123";
@@ -43,14 +44,43 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   }
 
   Future<void> _initializeCamera() async {
-    final cameras = await availableCameras();
-    final frontCamera = cameras.firstWhere(
+    _cameras = await availableCameras(); // store all cameras
+    final frontCamera = _cameras.firstWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
+      orElse: () => _cameras.first,
     );
     _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
     await _cameraController!.initialize();
     setState(() {});
+  }
+
+  Future<void> _toggleCamera() async {
+    // Ensure cameras are available
+    if (_cameras.isEmpty) _cameras = await availableCameras();
+    if (_cameraController != null) {
+      final currentLens = _cameraController!.description.lensDirection;
+      CameraDescription newCamera;
+      if (currentLens == CameraLensDirection.front) {
+        newCamera = _cameras.firstWhere(
+          (cam) => cam.lensDirection == CameraLensDirection.back,
+          orElse: () => _cameraController!.description,
+        );
+      } else {
+        newCamera = _cameras.firstWhere(
+          (cam) => cam.lensDirection == CameraLensDirection.front,
+          orElse: () => _cameraController!.description,
+        );
+      }
+      if (newCamera != _cameraController!.description) {
+        await _cameraController!.dispose();
+        _cameraController = CameraController(
+          newCamera,
+          ResolutionPreset.medium,
+        );
+        await _cameraController!.initialize();
+        setState(() {});
+      }
+    }
   }
 
   Future<void> _startListening() async {
@@ -234,6 +264,15 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
                 ),
               _buildMicButton(),
             ],
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: FloatingActionButton(
+              onPressed: _toggleCamera,
+              mini: true,
+              child: const Icon(Icons.switch_camera),
+            ),
           ),
         ],
       ),
