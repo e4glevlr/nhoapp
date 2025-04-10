@@ -217,30 +217,30 @@ class HomePage extends StatelessWidget {
                         children: [
                           Expanded(
                             child: _buildEmergencyCard(
-                              "Ambulance",
+                              "Kiểm tra",
                               "123",
                               Colors.green[100]!,
-                              Icons.local_shipping,
+                              Icons.book,
                               Colors.green,
                             ),
                           ),
                           SizedBox(width: 10),
                           Expanded(
                             child: _buildEmergencyCard(
-                              "Amergency",
+                              "Quản lý thời gian",
                               "112",
                               Colors.blue[100]!,
-                              Icons.local_taxi,
+                              Icons.calendar_month_outlined,
                               Colors.blue,
                             ),
                           ),
                           SizedBox(width: 10),
                           Expanded(
                             child: _buildEmergencyCard(
-                              "Firefighting",
+                              "Kỉ niệm",
                               "180",
                               Colors.orange[100]!,
-                              Icons.fire_extinguisher,
+                              Icons.image_sharp,
                               Colors.orange,
                             ),
                           ),
@@ -271,10 +271,10 @@ class HomePage extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildNavItem(Icons.chat_bubble_outline, "chat", Colors.green, true),
-                  _buildNavItem(Icons.mic, "voice", Colors.blue, false), // Thêm nút voice ở navigation bar
-                  _buildNavItem(Icons.map_outlined, "map", Colors.grey, false),
-                  _buildNavItem(Icons.person_outline, "account", Colors.grey, false),
+                  _buildNavItem(Icons.home_outlined, "Trang chủ", Colors.green, true),
+                  _buildNavItem(Icons.person_outlined, "Hồ sơ", Colors.blue, false), // Thêm nút voice ở navigation bar
+                  _buildNavItem(Icons.notifications_outlined, "Thông báo", Colors.yellow, false),
+                  _buildNavItem(Icons.settings_outlined, "Cài đặt", Colors.grey, false),
                 ],
               ),
             ),
