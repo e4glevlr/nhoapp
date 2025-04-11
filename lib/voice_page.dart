@@ -31,7 +31,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   void initState() {
     super.initState();
     _tts.setLanguage("vi-VN");
-    _tts.setSpeechRate(0.9);
+    _tts.setSpeechRate(1.0);
     _requestCameraPermission();
   }
 
