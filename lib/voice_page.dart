@@ -21,7 +21,8 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   String _currentText = '';
   List<_Message> _messages = [];
   CameraController? _cameraController;
-  List<CameraDescription> _cameras = []; // new state variable to cache cameras
+  List<CameraDescription> _cameras = [];
+  bool _isCameraVisible = false;
 
   final String userId = "user123";
   final String sessionId = "session123";
@@ -37,14 +38,14 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
   Future<void> _requestCameraPermission() async {
     final status = await Permission.camera.request();
     if (status.isGranted) {
-      _initializeCamera();
-    } else {
-      // Optionally, handle the case where permission is not granted
+      await _initializeCamera();
     }
   }
 
   Future<void> _initializeCamera() async {
-    _cameras = await availableCameras(); // store all cameras
+    if (_cameras.isEmpty) {
+      _cameras = await availableCameras();
+    }
     final frontCamera = _cameras.firstWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
       orElse: () => _cameras.first,
@@ -52,6 +53,15 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
     _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
     await _cameraController!.initialize();
     setState(() {});
+  }
+
+  Future<void> _toggleCameraVisibility() async {
+    if (_cameraController == null) {
+      await _initializeCamera();
+    }
+    setState(() {
+      _isCameraVisible = !_isCameraVisible;
+    });
   }
 
   Future<void> _toggleCamera() async {
@@ -212,7 +222,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
               ),
               const SizedBox(width: 12),
               Text(
-                _isListening ? "DỪNG GHI ÂM" : "🎙️ NÓI VỚI CHATBOT",
+                _isListening ? "DỪNG GHI ÂM" : "NÓI VỚI CHATBOT",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -242,7 +252,8 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
       body: Stack(
         children: [
           if (_cameraController != null &&
-              _cameraController!.value.isInitialized)
+              _cameraController!.value.isInitialized &&
+              _isCameraVisible)
             SizedBox.expand(child: CameraPreview(_cameraController!)),
           Column(
             children: [
@@ -250,8 +261,7 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
                 child: ListView.builder(
                   padding: const EdgeInsets.all(8),
                   itemCount: _messages.length,
-                  itemBuilder:
-                      (context, index) => _buildMessage(_messages[index]),
+                  itemBuilder: (context, index) => _buildMessage(_messages[index]),
                 ),
               ),
               if (_isListening)
@@ -268,10 +278,22 @@ class _VoiceChatPageState extends State<VoiceChatPage> {
           Positioned(
             top: 16,
             right: 16,
-            child: FloatingActionButton(
-              onPressed: _toggleCamera,
-              mini: true,
-              child: const Icon(Icons.switch_camera),
+            child: Column(
+              children: [
+                FloatingActionButton(
+                  onPressed: _toggleCameraVisibility,
+                  mini: true,
+                  child: Icon(_isCameraVisible ? Icons.camera_alt : Icons.camera),
+                ),
+                if (_isCameraVisible) ...[
+                  const SizedBox(height: 8),
+                  FloatingActionButton(
+                    onPressed: _toggleCamera,
+                    mini: true,
+                    child: const Icon(Icons.switch_camera),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
