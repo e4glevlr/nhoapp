@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chat_page.dart';
 import 'voice_page.dart';
-
+import 'test_page.dart'; // Added import for external TestPage
 
 class HomePage extends StatelessWidget {
   @override
@@ -66,12 +66,17 @@ class HomePage extends StatelessWidget {
                                     onPressed: () {
                                       Navigator.push(
                                         context,
-                                        MaterialPageRoute(builder: (context) => ChatPage()),
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatPage(),
+                                        ),
                                       );
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.green,
-                                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 30,
+                                        vertical: 12,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(10),
                                       ),
@@ -157,12 +162,17 @@ class HomePage extends StatelessWidget {
                                     onPressed: () {
                                       Navigator.push(
                                         context,
-                                        MaterialPageRoute(builder: (context) => VoiceChatPage()),
+                                        MaterialPageRoute(
+                                          builder: (context) => VoiceChatPage(),
+                                        ),
                                       );
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue,
-                                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 30,
+                                        vertical: 12,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(10),
                                       ),
@@ -181,11 +191,7 @@ class HomePage extends StatelessWidget {
                             Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                Icon(
-                                  Icons.mic,
-                                  size: 80,
-                                  color: Colors.blue,
-                                ),
+                                Icon(Icons.mic, size: 80, color: Colors.blue),
                                 Positioned(
                                   top: 0,
                                   right: -10,
@@ -216,12 +222,22 @@ class HomePage extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: _buildEmergencyCard(
-                              "Kiểm tra",
-                              "123",
-                              Colors.green[100]!,
-                              Icons.book,
-                              Colors.green,
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TestPage(),
+                                  ),
+                                );
+                              },
+                              child: _buildEmergencyCard(
+                                "Kiểm tra",
+                                "123",
+                                Colors.green[100]!,
+                                Icons.book,
+                                Colors.green,
+                              ),
                             ),
                           ),
                           SizedBox(width: 10),
@@ -247,7 +263,9 @@ class HomePage extends StatelessWidget {
                         ],
                       ),
 
-                      SizedBox(height: 30), // Giảm khoảng cách để phù hợp với nội dung mới
+                      SizedBox(
+                        height: 30,
+                      ), // Giảm khoảng cách để phù hợp với nội dung mới
                     ],
                   ),
                 ),
@@ -271,10 +289,30 @@ class HomePage extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildNavItem(Icons.home_outlined, "Trang chủ", Colors.green, true),
-                  _buildNavItem(Icons.person_outlined, "Hồ sơ", Colors.blue, false), // Thêm nút voice ở navigation bar
-                  _buildNavItem(Icons.notifications_outlined, "Thông báo", Colors.yellow, false),
-                  _buildNavItem(Icons.settings_outlined, "Cài đặt", Colors.grey, false),
+                  _buildNavItem(
+                    Icons.home_outlined,
+                    "Trang chủ",
+                    Colors.green,
+                    true,
+                  ),
+                  _buildNavItem(
+                    Icons.person_outlined,
+                    "Hồ sơ",
+                    Colors.blue,
+                    false,
+                  ), // Thêm nút voice ở navigation bar
+                  _buildNavItem(
+                    Icons.notifications_outlined,
+                    "Thông báo",
+                    Colors.yellow,
+                    false,
+                  ),
+                  _buildNavItem(
+                    Icons.settings_outlined,
+                    "Cài đặt",
+                    Colors.grey,
+                    false,
+                  ),
                 ],
               ),
             ),
@@ -284,7 +322,13 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildEmergencyCard(String title, String number, Color bgColor, IconData icon, Color iconColor) {
+  Widget _buildEmergencyCard(
+    String title,
+    String number,
+    Color bgColor,
+    IconData icon,
+    Color iconColor,
+  ) {
     return Container(
       padding: EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -300,19 +344,12 @@ class HomePage extends StatelessWidget {
               color: bgColor,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 24,
-            ),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           SizedBox(height: 10),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 5),
           Text(
@@ -328,23 +365,18 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, Color color, bool isActive) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    Color color,
+    bool isActive,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          color: color,
-          size: 24,
-        ),
+        Icon(icon, color: color, size: 24),
         SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-          ),
-        ),
+        Text(label, style: TextStyle(color: color, fontSize: 12)),
       ],
     );
   }

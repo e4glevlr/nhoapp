@@ -68,11 +68,7 @@ class _LoginPageState extends State<LoginPage> {
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
-                child: Image.asset(
-                  'images/robot.png',
-                  width: 205,
-                  height: 205,
-                ),
+                child: Image.asset('images/robot.png', width: 205, height: 205),
               ),
               SizedBox(height: 20),
               Padding(
@@ -128,7 +124,9 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                      vertical: 12.0, horizontal: 48.0),
+                    vertical: 12.0,
+                    horizontal: 48.0,
+                  ),
                   child: Text(
                     'Login',
                     style: TextStyle(
