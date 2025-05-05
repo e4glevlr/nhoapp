@@ -46,7 +46,7 @@ class HomePage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "Nhắn tin cùng Nhớ",
+                                    "Nhắn tin cùng ALDA AI",
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -55,7 +55,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   SizedBox(height: 10),
                                   Text(
-                                    "Cùng Nhớ nhắn tin  chia sẻ và thấu hiểu nhau",
+                                    "Cùng ALDA AI nhắn tin  chia sẻ và thấu hiểu nhau",
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey[600],
@@ -142,7 +142,7 @@ class HomePage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "Trò truyện cùng Nhớ",
+                                    "Trò truyện cùng ALDA AI",
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -151,7 +151,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   SizedBox(height: 10),
                                   Text(
-                                    "Cùng Nhớ trao đổi trò chuyện để thấu hiểu nhau",
+                                    "Cùng ALDA AI trao đổi trò chuyện để thấu hiểu nhau",
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey[600],
