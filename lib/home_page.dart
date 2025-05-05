@@ -55,7 +55,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   SizedBox(height: 10),
                                   Text(
-                                    "Cùng ALDA nhắn tin  chia sẻ và thấu hiểu nhau",
+                                    "Cùng ALDA nhắn tin luyện tập nhé",
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey[600],
@@ -250,7 +250,7 @@ class HomePage extends StatelessWidget {
                           SizedBox(width: 10),
                           Expanded(
                             child: _buildEmergencyCard(
-                              "Quản lý thời gian",
+                              "Lịch học",
                               "112",
                               Colors.blue[100]!,
                               Icons.calendar_month_outlined,
@@ -260,8 +260,8 @@ class HomePage extends StatelessWidget {
                           SizedBox(width: 10),
                           Expanded(
                             child: _buildEmergencyCard(
-                              "Kỉ niệm",
-                              "180",
+                              "Dữ liệu",
+                              "108",
                               Colors.orange[100]!,
                               Icons.image_sharp,
                               Colors.orange,

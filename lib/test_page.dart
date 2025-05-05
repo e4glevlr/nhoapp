@@ -523,9 +523,20 @@ class _TestPageState extends State<TestPage> {
     _logger.i("Manually stopping speech recognition...");
     try {
       await _speechToText.stop();
-      // onStatus callback handles state and processing
+      // *** FIX: Set state immediately after stopping ***
+      // This ensures the UI updates promptly when the user taps to stop.
+      // The onStatus callback will eventually confirm, but this makes the UI responsive.
+      setStateIfNotDisposed(() {
+        _isListening = false;
+        _logger.i("UI state manually set to not listening.");
+        // It's often good practice to clear lastWords here too,
+        // although _onSpeechStatus might handle it as well.
+        // _lastWords = ''; // Uncomment if needed, but onStatus handles it currently
+      });
+      // onStatus callback will still handle final processing/state confirmation
     } catch (e) {
       _logger.e("Error stopping speech recognition: $e");
+      // Ensure state is false even if stop fails
       setStateIfNotDisposed(() {
         _isListening = false;
         _lastWords = '';
