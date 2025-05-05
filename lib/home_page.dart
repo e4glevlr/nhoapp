@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chat_page.dart';
-import 'voice_page.dart';
-import 'test_page.dart'; // Added import for external TestPage
+// import 'voice_page.dart'; // Bạn không cần import voice_page nếu không dùng nữa
+import 'test_page.dart'; // Đảm bảo import này đúng
 
 class HomePage extends StatelessWidget {
   @override
@@ -46,7 +46,7 @@ class HomePage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "Nhắn tin cùng ALDA AI",
+                                    "Nhắn tin cùng ALDA",
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -55,7 +55,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   SizedBox(height: 10),
                                   Text(
-                                    "Cùng ALDA AI nhắn tin  chia sẻ và thấu hiểu nhau",
+                                    "Cùng ALDA nhắn tin  chia sẻ và thấu hiểu nhau",
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey[600],
@@ -127,7 +127,7 @@ class HomePage extends StatelessWidget {
 
                       SizedBox(height: 30),
 
-                      // Voice AI Card - THÊM MỚI
+                      // Voice AI Card - ĐÃ SỬA ĐỔI
                       Container(
                         padding: EdgeInsets.all(20),
                         width: double.infinity,
@@ -142,7 +142,7 @@ class HomePage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "Trò truyện cùng ALDA AI",
+                                    "Trò truyện cùng ALDA",
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -151,7 +151,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   SizedBox(height: 10),
                                   Text(
-                                    "Cùng ALDA AI trao đổi trò chuyện để thấu hiểu nhau",
+                                    "Cùng ALDA trao đổi trò chuyện nhé",
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey[600],
@@ -163,7 +163,12 @@ class HomePage extends StatelessWidget {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => VoiceChatPage(),
+                                          // --- THAY ĐỔI Ở ĐÂY ---
+                                          builder:
+                                              (context) =>
+                                                  TestPage(), // Chuyển đến TestPage
+                                          // builder: (context) => VoiceChatPage(), // Code cũ
+                                          // ---------------------
                                         ),
                                       );
                                     },
@@ -227,7 +232,9 @@ class HomePage extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => TestPage(),
+                                    builder:
+                                        (context) =>
+                                            TestPage(), // Nút này cũng đang trỏ đến TestPage
                                   ),
                                 );
                               },
@@ -350,6 +357,7 @@ class HomePage extends StatelessWidget {
           Text(
             title,
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center, // Căn giữa text nếu dài
           ),
           SizedBox(height: 5),
           Text(
@@ -374,9 +382,26 @@ class HomePage extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 24),
+        Icon(
+          icon,
+          color: isActive ? color : Colors.grey,
+          size: 24,
+        ), // Thay đổi màu icon dựa trên isActive
         SizedBox(height: 4),
-        Text(label, style: TextStyle(color: color, fontSize: 12)),
+        Text(
+          label,
+          style: TextStyle(
+            color:
+                isActive
+                    ? color
+                    : Colors.grey, // Thay đổi màu text dựa trên isActive
+            fontSize: 12,
+            fontWeight:
+                isActive
+                    ? FontWeight.bold
+                    : FontWeight.normal, // Làm đậm nếu active
+          ),
+        ),
       ],
     );
   }

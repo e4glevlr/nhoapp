@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'dart:convert'; // Import dart:convert for jsonEncode
 import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http; // Already imported
 import 'package:logger/logger.dart';
-import 'package:speech_to_text/speech_recognition_result.dart'; // NEW: Import for STT result
-import 'package:speech_to_text/speech_to_text.dart'; // NEW: Import for STT
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 // Chuyển thành StatefulWidget
 class TestPage extends StatefulWidget {
@@ -17,54 +17,44 @@ class TestPage extends StatefulWidget {
 
 // Tạo State class tương ứng
 class _TestPageState extends State<TestPage> {
-  // --- Sao chép các biến trạng thái từ WhepPlayerPage ---
-  final Logger _logger = Logger(); // Tùy chọn
+  // --- State variables (unchanged) ---
+  final Logger _logger = Logger();
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   RTCPeerConnection? _peerConnection;
   MediaStream? _remoteStream;
-  bool _isLoading = false; // General loading state (e.g., for WHEP)
+  bool _isLoading = false;
   String? _errorMessage;
   String _status = 'Disconnected';
-
-  // !!! THAY THẾ ĐỊA CHỈ SERVER SRS CỦA BẠN VÀO ĐÂY !!!
   final String _whepUrl =
       'https://aitools.ptit.edu.vn/rtc/v1/whep/?app=live&stream=livestream';
-  // ----------------------------------------------------
-
-  // --- Biến trạng thái cho giao diện Chat ---
   final TextEditingController _chatController = TextEditingController();
-  final ScrollController _scrollController =
-      ScrollController(); // NEW: Scroll controller for chat
+  final ScrollController _scrollController = ScrollController();
   final List<String> _messages = [
-    "Chào mừng đến với buổi stream!",
-    "Đây là khung chat mẫu.",
-    "Nhấn nút micro để nói.",
-  ]; // Danh sách tin nhắn mẫu
-
-  // --- NEW: Biến trạng thái cho Speech-to-Text ---
+    "Welcome to the stream!",
+    "This is a sample chat.",
+    "Press the microphone button to speak.",
+  ];
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
-  String _lastWords = ''; // Stores recognized words during listening
-  // NEW: Define user_id and session_id (replace with your actual logic if needed)
+  String _lastWords = '';
   final String _userId = 'flutter_user_test_001';
   final String _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-  // NEW: State for chatbot loading
   bool _isSendingToBot = false;
-  // ---------------------------------------------
+  // ------------------------------------
 
   @override
   void initState() {
-    super.initState(); // Quan trọng: gọi super.initState() trước
+    super.initState();
     _initializeRenderer();
-    _initSpeech(); // NEW: Initialize speech recognition
+    _initSpeech();
   }
 
+  // --- _initializeRenderer, _initSpeech, dispose, _connect, _disconnect, setStateIfNotDisposed (unchanged) ---
   Future<void> _initializeRenderer() async {
     await _renderer.initialize();
   }
 
-  // --- NEW: Initialize Speech-to-Text ---
   Future<void> _initSpeech() async {
     try {
       bool available = await _speechToText.initialize(
@@ -76,7 +66,14 @@ class _TestPageState extends State<TestPage> {
           _speechEnabled = available;
           if (!available) {
             _logger.w("Speech recognition not available.");
-            // Optionally show a message to the user
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "Speech recognition service is not available on this device.",
+                ),
+                duration: Duration(seconds: 3),
+              ),
+            );
           } else {
             _logger.i("Speech recognition initialized successfully.");
           }
@@ -87,29 +84,31 @@ class _TestPageState extends State<TestPage> {
       if (mounted) {
         setStateIfNotDisposed(() {
           _speechEnabled = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error initializing speech recognition: $e"),
+              duration: const Duration(seconds: 3),
+            ),
+          );
         });
       }
     }
   }
-  // ------------------------------------
 
   @override
   void dispose() {
     _logger.i("Disposing TestPage...");
     _renderer.dispose();
-    _remoteStream?.getTracks().forEach(
-      (track) => track.stop(),
-    ); // Dùng forEach ở đây vẫn ổn vì không cần await
+    _remoteStream?.getTracks().forEach((track) => track.stop());
     _remoteStream?.dispose();
     _peerConnection?.close();
     _peerConnection?.dispose();
     _chatController.dispose();
-    _scrollController.dispose(); // NEW: Dispose scroll controller
-    _speechToText.cancel(); // NEW: Cancel any ongoing speech operation
-    super.dispose(); // Quan trọng: gọi super.dispose() sau cùng
+    _scrollController.dispose();
+    _speechToText.cancel();
+    super.dispose();
   }
 
-  // Hàm kết nối WHEP (giống hệt WhepPlayerPage, chỉ thay đổi log và setState)
   Future<void> _connect() async {
     if (_isLoading || _peerConnection != null) return;
 
@@ -122,53 +121,45 @@ class _TestPageState extends State<TestPage> {
 
     try {
       _peerConnection = await createPeerConnection({
-        'iceServers': [
-          // {'urls': 'stun:stun.l.google.com:19302'}, // Có thể thêm STUN server nếu cần
-        ],
-        'sdpSemantics': 'unified-plan', // Thường là mặc định nhưng thêm cho rõ
+        'iceServers': [],
+        'sdpSemantics': 'unified-plan',
       }, {});
 
-      // Create a new stream for each connection attempt
       _remoteStream = await createLocalMediaStream(
         'remoteStream-${DateTime.now().millisecondsSinceEpoch}',
-      ); // Tên stream duy nhất
+      );
 
-      // Assign the stream BEFORE setting up listeners that might use it
       setStateIfNotDisposed(() {
         _renderer.srcObject = _remoteStream;
       });
 
+      // --- PeerConnection event handlers (onTrack, onIceCandidate, onIceConnectionState, onConnectionState) ---
+      // (Assume these are the same as in the previous version for brevity)
       _peerConnection!.onTrack = (RTCTrackEvent event) {
         _logger.i(
           "Track received: kind=${event.track.kind}, id=${event.track.id}",
         );
         if (event.streams.isEmpty) {
           _logger.w("Track received but event.streams is empty!");
-          // Handle scenario where track is added without an associated stream initially
-          // Often, the track is automatically added to the stream associated
-          // with the transceiver, which might be _remoteStream.
-          // Add it manually if needed and not already present:
           if (_remoteStream != null &&
               !_remoteStream!.getTracks().any((t) => t.id == event.track.id)) {
             _logger.i(
               "Manually adding track ${event.track.id} to _remoteStream",
             );
             _remoteStream?.addTrack(event.track);
-            // Potentially trigger UI update if needed here
             setStateIfNotDisposed(() {
               _renderer.srcObject = _remoteStream;
             });
           }
-          return; // Exit early if no stream info
+          return;
         }
 
-        final stream = event.streams[0]; // Use the first stream associated
+        final stream = event.streams[0];
 
         if (event.track.kind == 'video' || event.track.kind == 'audio') {
           _logger.i(
             "--> Received ${event.track.kind?.toUpperCase()} track: ${event.track.id} for stream: ${stream.id}",
           );
-          // Ensure the track is added to our target stream
           if (_remoteStream != null && stream.id == _remoteStream!.id) {
             if (!_remoteStream!.getTracks().any(
               (t) => t.id == event.track.id,
@@ -187,12 +178,10 @@ class _TestPageState extends State<TestPage> {
           }
         }
 
-        // Quan trọng: cập nhật renderer khi track sẵn sàng hoặc unmute
         event.track.onUnMute = () {
           _logger.i("Track unmuted: ${event.track.id}");
           if (mounted && _remoteStream != null) {
             setState(() {
-              // Cần gọi setState để cập nhật UI, ngay cả khi srcObject không thay đổi tham chiếu
               _renderer.srcObject = _remoteStream;
             });
           }
@@ -211,7 +200,6 @@ class _TestPageState extends State<TestPage> {
         };
         event.track.onMute = () => _logger.w("Track muted: ${event.track.id}");
 
-        // Thử cập nhật renderer ngay khi có track
         if (mounted && _remoteStream != null) {
           setState(() {
             _renderer.srcObject = _remoteStream;
@@ -223,7 +211,7 @@ class _TestPageState extends State<TestPage> {
         if (candidate.candidate != null) {
           _logger.i(
             'Got ICE candidate: ${candidate.candidate!.substring(0, 20)}...',
-          ); // Log ngắn gọn
+          );
         } else {
           _logger.i('End of ICE candidates.');
         }
@@ -270,6 +258,7 @@ class _TestPageState extends State<TestPage> {
           });
         }
       };
+      //----------------------------------------------------------------------
 
       await _peerConnection!.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
@@ -292,14 +281,14 @@ class _TestPageState extends State<TestPage> {
             headers: {'Content-Type': 'application/sdp'},
             body: offer.sdp,
           )
-          .timeout(const Duration(seconds: 15)); // Increase timeout slightly
+          .timeout(const Duration(seconds: 15));
 
       _logger.i("Received WHEP response: Status=${response.statusCode}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final answerSdp = response.body;
         _logger.i("Received Answer SDP (length: ${answerSdp.length})");
-        _logger.d("Answer SDP:\n$answerSdp"); // Log answer để debug
+        _logger.d("Answer SDP:\n$answerSdp");
         final answer = RTCSessionDescription(answerSdp, 'answer');
         await _peerConnection!.setRemoteDescription(answer);
         _logger.i("Remote description set successfully!");
@@ -343,19 +332,16 @@ class _TestPageState extends State<TestPage> {
     }
   }
 
-  // Hàm ngắt kết nối (Sử dụng vòng lặp for để await từng track.stop())
   Future<void> _disconnect() async {
     _logger.i("Disconnecting...");
-    // Prevent multiple disconnect calls
     if (_status == 'Disconnecting...' || _peerConnection == null) {
       _logger.w("Already disconnecting or not connected.");
-      // Ensure state is reset if called while not connected
       if (_peerConnection == null && _status != 'Disconnected') {
         setStateIfNotDisposed(() {
           _status = 'Disconnected';
           _isLoading = false;
           _errorMessage = null;
-          _renderer.srcObject = null; // Ensure renderer is cleared
+          _renderer.srcObject = null;
         });
       }
       return;
@@ -363,7 +349,6 @@ class _TestPageState extends State<TestPage> {
 
     setStateIfNotDisposed(() {
       _status = 'Disconnecting...';
-      // Keep _isLoading true during disconnect to prevent reconnect attempts
       _isLoading = true;
     });
 
@@ -379,7 +364,6 @@ class _TestPageState extends State<TestPage> {
     }
 
     try {
-      // Stop tracks first
       if (tracksToStop.isNotEmpty) {
         _logger.i("Stopping ${tracksToStop.length} track(s)...");
         await Future.wait(
@@ -395,7 +379,6 @@ class _TestPageState extends State<TestPage> {
         );
       }
 
-      // Dispose stream
       if (_remoteStream != null) {
         try {
           await _remoteStream!.dispose();
@@ -403,10 +386,9 @@ class _TestPageState extends State<TestPage> {
         } catch (e) {
           _logger.w("Error disposing remote stream: $e");
         }
-        _remoteStream = null; // Set to null regardless of disposal error
+        _remoteStream = null;
       }
 
-      // Close and dispose peer connection
       if (_peerConnection != null) {
         try {
           await _peerConnection!.close();
@@ -415,17 +397,15 @@ class _TestPageState extends State<TestPage> {
           _logger.w("Error closing peer connection: $e");
         }
         try {
-          // Add a small delay before disposing, sometimes helps avoid race conditions
           await Future.delayed(const Duration(milliseconds: 100));
           await _peerConnection!.dispose();
           _logger.i("Peer connection disposed.");
         } catch (e) {
           _logger.w("Error disposing peer connection: $e");
         }
-        _peerConnection = null; // Set to null regardless of disposal error
+        _peerConnection = null;
       }
 
-      // Reset renderer cuối cùng, kiểm tra mounted
       if (mounted) {
         _renderer.srcObject = null;
         _logger.i("Renderer srcObject set to null.");
@@ -437,12 +417,10 @@ class _TestPageState extends State<TestPage> {
     } catch (e, s) {
       _logger.e("Error during disconnection steps", error: e, stackTrace: s);
     } finally {
-      // Reset state after all cleanup attempts
       setStateIfNotDisposed(() {
         _status = 'Disconnected';
-        _isLoading = false; // Now safe to reset loading
-        _errorMessage = null; // Clear error on successful/attempted disconnect
-        // Ensure renderer is null if not already done
+        _isLoading = false;
+        _errorMessage = null;
         if (mounted && _renderer.srcObject != null) {
           _renderer.srcObject = null;
         }
@@ -450,7 +428,6 @@ class _TestPageState extends State<TestPage> {
     }
   }
 
-  // Hàm helper để tránh gọi setState khi widget đã bị dispose
   void setStateIfNotDisposed(Function() fn) {
     if (mounted) {
       setState(fn);
@@ -458,42 +435,39 @@ class _TestPageState extends State<TestPage> {
       _logger.w("Tried to call setState on a disposed widget.");
     }
   }
+  // ---------------------------------------------------------------------------
 
   // Hàm xử lý gửi tin nhắn (từ text input)
   void _sendMessage() {
     final text = _chatController.text.trim();
     if (text.isNotEmpty) {
-      // Add user message immediately
       _addMessageToList("You: $text");
       _chatController.clear();
-
-      // Call the chatbot function
       _sendToChatbot(text);
-
       _logger.i("Chat message sent via text input: $text");
     }
   }
 
-  // --- NEW: Speech-to-Text methods ---
+  // --- Speech-to-Text methods (_onSpeechStatus, _onSpeechError, _onSpeechResult, _startListening, _stopListening, _handleMicTap) ---
+  // (Assume these are the same as in the previous version for brevity)
   void _onSpeechStatus(String status) {
     _logger.i("Speech status changed: $status");
-    // Update listening state based on status (e.g., 'listening', 'notListening', 'done')
     bool listening = status == 'listening';
     if (_isListening != listening && mounted) {
       setStateIfNotDisposed(() {
         _isListening = listening;
-        // If status is 'done' or 'notListening' and we were listening, process the result
         if (!_isListening && _lastWords.isNotEmpty) {
           _logger.i("Speech recognition finished. Recognized: $_lastWords");
-          // Automatically send to chatbot when listening stops naturally
+          // Add recognized text to chat list
+          _addMessageToList("You (voice): $_lastWords");
+          // Send to chatbot
           _sendToChatbot(_lastWords);
-          _lastWords = ''; // Clear after sending
+          _lastWords = '';
         } else if (!_isListening) {
-          // Handle cases where listening stopped without recognizing words (e.g., cancelled, timeout with no speech)
           _logger.i(
             "Speech recognition stopped without results or already processed.",
           );
-          _lastWords = ''; // Ensure it's cleared
+          _lastWords = '';
         }
       });
     }
@@ -502,11 +476,10 @@ class _TestPageState extends State<TestPage> {
   void _onSpeechError(dynamic errorNotification) {
     _logger.e("Speech error: ${errorNotification.errorMsg}");
     setStateIfNotDisposed(() {
-      _isListening = false; // Ensure listening stops on error
-      _lastWords = ''; // Clear any partial results
-      // Optionally display an error message in the chat
+      _isListening = false;
+      _lastWords = '';
       _addMessageToList(
-        "Bot: Lỗi nhận dạng giọng nói: ${errorNotification.errorMsg}",
+        "Bot: Speech recognition error: ${errorNotification.errorMsg}",
       );
     });
   }
@@ -517,36 +490,25 @@ class _TestPageState extends State<TestPage> {
     );
     setStateIfNotDisposed(() {
       _lastWords = result.recognizedWords;
-      // Optional: Update chat input temporarily while speaking?
-      // _chatController.text = _lastWords; // Example, might be annoying
     });
-    // If the result is final, we could potentially trigger send here,
-    // but often letting the pause detection handle it is smoother.
-    // if (result.finalResult && _lastWords.isNotEmpty) {
-    //    _sendToChatbot(_lastWords);
-    //    _lastWords = '';
-    // }
   }
 
   Future<void> _startListening() async {
     if (!_speechEnabled || _isListening) return;
     _logger.i("Starting speech recognition...");
-    _lastWords = ''; // Clear previous words
+    _lastWords = '';
     try {
       await _speechToText.listen(
         onResult: _onSpeechResult,
-        localeId: 'vi_VN', // Set Vietnamese locale
-        listenFor: const Duration(seconds: 30), // Max listen duration
-        pauseFor: const Duration(seconds: 4), // Auto-stop after 4s silence
-        partialResults: true, // Get intermediate results
-        cancelOnError: true, // Stop listening on error
-        listenMode:
-            ListenMode.confirmation, // Confirmation mode might be suitable
+        localeId: 'en_US', // English locale
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 4),
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: ListenMode.confirmation,
       );
       setStateIfNotDisposed(() {
         _isListening = true;
-        // Maybe add a temporary message?
-        // _addMessageToList("Bot: Đang nghe...", temporary: true);
       });
     } catch (e) {
       _logger.e("Error starting speech recognition: $e");
@@ -561,24 +523,24 @@ class _TestPageState extends State<TestPage> {
     _logger.i("Manually stopping speech recognition...");
     try {
       await _speechToText.stop();
-      // The onStatus callback should handle setting _isListening = false
-      // and sending the result if _lastWords is not empty.
+      // onStatus callback handles state and processing
     } catch (e) {
       _logger.e("Error stopping speech recognition: $e");
       setStateIfNotDisposed(() {
-        _isListening = false; // Ensure state is correct even if stop fails
-        _lastWords = ''; // Clear words on manual stop error
+        _isListening = false;
+        _lastWords = '';
       });
     }
   }
 
-  // MODIFIED: Microphone tap handler
   void _handleMicTap() {
     if (!_speechEnabled) {
       _logger.w("Mic tapped but speech is not enabled/initialized.");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Không thể khởi động nhận dạng giọng nói."),
+          content: Text(
+            "Speech recognition is not available or not initialized.",
+          ),
           duration: Duration(seconds: 2),
         ),
       );
@@ -593,9 +555,9 @@ class _TestPageState extends State<TestPage> {
       _startListening();
     }
   }
-  // ------------------------------------
+  // ---------------------------------------------------------------------------
 
-  // --- NEW: Function to send text to chatbot ---
+  // --- Function to send text to chatbot API ---
   Future<void> _sendToChatbot(String inputText) async {
     if (inputText.isEmpty || _isSendingToBot) {
       _logger.w("Skipping chatbot request: Empty input or already sending.");
@@ -603,25 +565,23 @@ class _TestPageState extends State<TestPage> {
     }
 
     setStateIfNotDisposed(() {
-      _isSendingToBot = true; // Indicate bot processing
-      // Optionally add a "Bot is thinking..." message
-      // _addMessageToList("Bot: ...", temporary: true);
+      _isSendingToBot = true;
     });
 
-    final String apiUrl = 'https://aitools.ptit.edu.vn/nho/chat';
-    _logger.i("Sending to chatbot API: $apiUrl");
+    final String chatApiUrl =
+        'https://aitools.ptit.edu.vn/nho/chat'; // Chatbot API
+    _logger.i("Sending to chatbot API: $chatApiUrl");
     _logger.i(
       "Payload: user_id=$_userId, session_id=$_sessionId, text=$inputText",
     );
 
     try {
-      final uri = Uri.parse(apiUrl);
+      final uri = Uri.parse(chatApiUrl);
       var request = http.MultipartRequest('POST', uri);
       request.fields['user_id'] = _userId;
       request.fields['session_id'] = _sessionId;
       request.fields['text'] = inputText;
 
-      // Add timeout to the send operation
       var streamedResponse = await request.send().timeout(
         const Duration(seconds: 20),
       );
@@ -633,52 +593,106 @@ class _TestPageState extends State<TestPage> {
       if (response.statusCode == 200) {
         try {
           final jsonResponse = jsonDecode(response.body);
-          _logger.d(
-            "Chatbot API response body: ${response.body}",
-          ); // Log full response
+          _logger.d("Chatbot API response body: ${response.body}");
 
-          // Extract the response field
           final String? botReply = jsonResponse['response'] as String?;
 
           if (botReply != null && botReply.isNotEmpty) {
+            // Add the bot's reply to the UI first
             _addMessageToList("Bot: $botReply");
+
+            // *******************************************************
+            // * NEW: Call the second API with the bot's response    *
+            // *******************************************************
+            await _sendResponseToAldaBackend(botReply);
           } else {
             _logger.w("Chatbot response field is missing or empty.");
-            _addMessageToList("Bot: (Không nhận được phản hồi hợp lệ)");
+            _addMessageToList("Bot: (Received an empty or invalid response)");
           }
         } catch (e) {
           _logger.e("Error decoding chatbot JSON response: $e");
-          _addMessageToList("Bot: (Lỗi xử lý phản hồi từ bot)");
+          _addMessageToList("Bot: (Error processing bot response)");
         }
       } else {
         _logger.e(
           "Chatbot API request failed: ${response.statusCode}\nBody: ${response.body}",
         );
-        _addMessageToList("Bot: (Lỗi ${response.statusCode} khi gọi bot)");
+        _addMessageToList("Bot: (Error ${response.statusCode} calling bot)");
       }
     } on TimeoutException catch (e) {
       _logger.e("Chatbot API request timed out: $e");
-      _addMessageToList("Bot: (Yêu cầu tới bot bị timeout)");
+      _addMessageToList("Bot: (Request to bot timed out)");
     } catch (e, s) {
       _logger.e("Error sending to chatbot API", error: e, stackTrace: s);
-      _addMessageToList("Bot: (Lỗi kết nối tới bot)");
+      _addMessageToList("Bot: (Error connecting to bot)");
     } finally {
       setStateIfNotDisposed(() {
-        _isSendingToBot = false; // Done processing
-        // Remove any temporary "thinking" message if used
+        _isSendingToBot = false;
       });
     }
   }
   // ---------------------------------------------
 
-  // --- NEW: Helper to add message and scroll ---
+  // --- NEW: Function to send bot response to Alda Backend API ---
+  Future<void> _sendResponseToAldaBackend(String botReplyText) async {
+    final String aldaUrl =
+        'https://aitools.ptit.edu.vn/alda_backend/human'; // Second API URL
+    _logger.i("Sending bot response to Alda Backend: $aldaUrl");
+
+    try {
+      // Prepare JSON body
+      final Map<String, String> requestBody = {
+        'text': botReplyText, // The bot's answer
+        'type': 'echo', // Fixed type as requested
+      };
+      final String encodedBody = jsonEncode(requestBody);
+
+      _logger.d("Alda Backend Payload: $encodedBody"); // Log the payload
+
+      // Make the POST request
+      final response = await http
+          .post(
+            Uri.parse(aldaUrl),
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+            }, // Set content type header
+            body: encodedBody, // Send encoded JSON string
+          )
+          .timeout(const Duration(seconds: 15)); // Add a timeout
+
+      // Check the response status from the second API
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _logger.i(
+          "Successfully sent response to Alda Backend. Status: ${response.statusCode}",
+        );
+        // You can log the response body if needed:
+        // _logger.d("Alda Backend Response Body: ${response.body}");
+      } else {
+        _logger.e(
+          "Failed to send response to Alda Backend. Status: ${response.statusCode}, Body: ${response.body}",
+        );
+        // No user-facing error message here, just logging the failure.
+      }
+    } on TimeoutException catch (e) {
+      _logger.e("Timeout sending response to Alda Backend: $e");
+      // Handle timeout specifically if needed
+    } catch (e, s) {
+      _logger.e(
+        "Error sending response to Alda Backend",
+        error: e,
+        stackTrace: s,
+      );
+      // Handle other potential errors (network issues, etc.)
+    }
+    // This function doesn't update the UI directly.
+  }
+  // -------------------------------------------------------------
+
+  // --- Helper to add message and scroll ---
   void _addMessageToList(String message, {bool temporary = false}) {
-    // TODO: Implement logic for temporary messages if needed
-    // For now, all messages are added permanently
     setStateIfNotDisposed(() {
       _messages.add(message);
     });
-    // Auto-scroll to bottom after adding a message
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -691,23 +705,27 @@ class _TestPageState extends State<TestPage> {
   }
   // -------------------------------------------
 
+  // --- Build method (Assume mostly unchanged from previous version) ---
   @override
   Widget build(BuildContext context) {
+    // (Structure remains the same: Scaffold, AppBar, Column with Video/Controls/Chat)
+    // (RTCVideoView, Buttons, ListView.builder, TextField, FAB etc. are kept as before)
     return Scaffold(
       appBar: AppBar(
         title: const Text("Video Stream & Chat"),
         backgroundColor: Colors.blueGrey[800],
         actions: [
-          // NEW: Add a status indicator for speech service
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
-            child: Icon(
-              _speechEnabled ? Icons.check_circle : Icons.cancel,
-              color: _speechEnabled ? Colors.greenAccent : Colors.redAccent,
-              semanticLabel:
+            child: Tooltip(
+              message:
                   _speechEnabled
                       ? "Speech service available"
-                      : "Speech service unavailable",
+                      : "Speech service unavailable or error",
+              child: Icon(
+                _speechEnabled ? Icons.check_circle : Icons.cancel,
+                color: _speechEnabled ? Colors.greenAccent : Colors.redAccent,
+              ),
             ),
           ),
         ],
@@ -715,7 +733,7 @@ class _TestPageState extends State<TestPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- Phần trên: Video Stream ---
+            // Video Stream Section
             Expanded(
               flex: 3,
               child: Padding(
@@ -732,8 +750,7 @@ class _TestPageState extends State<TestPage> {
                       alignment: Alignment.center,
                       children: [
                         // Video View
-                        if (_renderer.textureId !=
-                            null) // Ensure renderer is ready
+                        if (_renderer.textureId != null)
                           RTCVideoView(
                             _renderer,
                             mirror: false,
@@ -748,17 +765,15 @@ class _TestPageState extends State<TestPage> {
                               style: TextStyle(color: Colors.white54),
                             ),
                           ),
-
-                        // Loading Indicator for WHEP connection
+                        // Loading & Status Overlays
                         if (_isLoading && _status.contains('Connecting'))
                           const CircularProgressIndicator(),
-
-                        // Status Text Overlay
                         if (!_isLoading &&
                             _status != 'Connected' &&
                             _status != 'Checking...' &&
                             _status != 'Negotiating...')
                           Positioned(
+                            // Status text
                             bottom: 10,
                             left: 10,
                             right: 10,
@@ -783,8 +798,7 @@ class _TestPageState extends State<TestPage> {
                               ),
                             ),
                           ),
-                        // NEW: Listening Indicator
-                        if (_isListening)
+                        if (_isListening) // Listening indicator
                           Positioned(
                             top: 10,
                             right: 10,
@@ -807,8 +821,7 @@ class _TestPageState extends State<TestPage> {
                 ),
               ),
             ),
-
-            // --- Hàng điều khiển ---
+            // Control Buttons Section
             Padding(
               padding: const EdgeInsets.symmetric(
                 vertical: 5.0,
@@ -847,7 +860,7 @@ class _TestPageState extends State<TestPage> {
                         (_isLoading && _status == 'Disconnecting...') ||
                                 _peerConnection == null
                             ? null
-                            : _disconnect, // Disable while disconnecting
+                            : _disconnect,
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
                       backgroundColor: Colors.red[700],
@@ -856,8 +869,7 @@ class _TestPageState extends State<TestPage> {
                 ],
               ),
             ),
-
-            // --- Phần dưới: Chat ---
+            // Chat Section
             Expanded(
               flex: 2,
               child: Container(
@@ -880,19 +892,19 @@ class _TestPageState extends State<TestPage> {
                 ),
                 child: Column(
                   children: [
-                    // Khu vực hiển thị tin nhắn
+                    // Message List Area
                     Expanded(
                       child: ListView.builder(
-                        controller:
-                            _scrollController, // NEW: Attach scroll controller
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(10.0),
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final message = _messages[index];
-                          final isUserMessage = message.startsWith("You:");
                           final isUserVoiceMessage = message.startsWith(
                             "You (voice):",
                           );
+                          final isUserMessage =
+                              message.startsWith("You:") && !isUserVoiceMessage;
                           final isBotMessage = message.startsWith("Bot:");
 
                           Alignment alignment;
@@ -902,9 +914,7 @@ class _TestPageState extends State<TestPage> {
 
                           if (isUserVoiceMessage) {
                             alignment = Alignment.centerRight;
-                            bubbleColor =
-                                Colors
-                                    .lightBlue[300]!; // Slightly different blue for voice
+                            bubbleColor = Colors.lightBlue[300]!;
                             textColor = Colors.white;
                             displayMessage = message.substring(
                               "You (voice): ".length,
@@ -920,7 +930,6 @@ class _TestPageState extends State<TestPage> {
                             textColor = Colors.black87;
                             displayMessage = message.substring("Bot: ".length);
                           } else {
-                            // Default style for system messages like "Welcome..."
                             alignment = Alignment.center;
                             bubbleColor = Colors.grey[300]!;
                             textColor = Colors.black54;
@@ -955,7 +964,7 @@ class _TestPageState extends State<TestPage> {
                         },
                       ),
                     ),
-                    // NEW: Loading indicator for chatbot
+                    // Bot thinking indicator
                     if (_isSendingToBot)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 4.0),
@@ -969,7 +978,7 @@ class _TestPageState extends State<TestPage> {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              "Bot đang trả lời...",
+                              "Bot is replying...",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontStyle: FontStyle.italic,
@@ -979,9 +988,8 @@ class _TestPageState extends State<TestPage> {
                           ],
                         ),
                       ),
-                    // Đường kẻ phân cách
                     Divider(height: 1, color: Colors.grey[400]),
-                    // Khu vực nhập tin nhắn
+                    // Message Input Area
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8.0,
@@ -993,7 +1001,7 @@ class _TestPageState extends State<TestPage> {
                             child: TextField(
                               controller: _chatController,
                               decoration: InputDecoration(
-                                hintText: "Nhập tin nhắn...",
+                                hintText: "Type a message...",
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20.0),
                                   borderSide: BorderSide.none,
@@ -1009,7 +1017,6 @@ class _TestPageState extends State<TestPage> {
                             ),
                           ),
                           const SizedBox(width: 8.0),
-                          // Nút gửi tin nhắn
                           IconButton(
                             icon: Icon(
                               Icons.send,
@@ -1032,34 +1039,27 @@ class _TestPageState extends State<TestPage> {
           ],
         ),
       ),
-      // Nút hành động nổi (Floating Action Button) cho Micro
       floatingActionButton: FloatingActionButton(
-        onPressed:
-            (_speechEnabled &&
-                    !_isSendingToBot) // Disable mic while bot is thinking
-                ? _handleMicTap
-                : null, // Disable if speech not enabled or bot is busy
+        onPressed: (_speechEnabled && !_isSendingToBot) ? _handleMicTap : null,
         backgroundColor:
             _isListening
-                ? Colors
-                    .redAccent // Red when listening
-                : (_speechEnabled
-                    ? Colors.blueGrey[600]
-                    : Colors.grey), // Grey if disabled
-        tooltip: _isListening ? 'Dừng nói' : 'Nhấn để nói',
+                ? Colors.redAccent
+                : (_speechEnabled ? Colors.blueGrey[600] : Colors.grey),
+        tooltip: _isListening ? 'Stop listening' : 'Tap to speak',
         child: Icon(
-          _isListening ? Icons.mic_off : Icons.mic, // Toggle icon
+          _isListening ? Icons.mic_off : Icons.mic,
           color: Colors.white,
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      // Thêm một BottomAppBar giả
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 6.0,
         color: Colors.blueGrey[800],
-        child: Container(height: 40.0), // Height needed for the notch effect
+        child: Container(height: 40.0),
       ),
     );
   }
+
+  //--------------------------------------------------------------------
 }
