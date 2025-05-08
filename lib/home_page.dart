@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'chat_page.dart';
 // import 'voice_page.dart'; // Bạn không cần import voice_page nếu không dùng nữa
 import 'test_page.dart'; // Đảm bảo import này đúng
+import 'documents_page.dart'; // <<-- thêm import
 
 class HomePage extends StatelessWidget {
   @override
@@ -259,12 +260,22 @@ class HomePage extends StatelessWidget {
                           ),
                           SizedBox(width: 10),
                           Expanded(
-                            child: _buildEmergencyCard(
-                              "Dữ liệu",
-                              "108",
-                              Colors.orange[100]!,
-                              Icons.image_sharp,
-                              Colors.orange,
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DocumentManagerPage(),
+                                  ),
+                                );
+                              },
+                              child: _buildEmergencyCard(
+                                "Dữ liệu",
+                                "108",
+                                Colors.orange[100]!,
+                                Icons.image_sharp,
+                                Colors.orange,
+                              ),
                             ),
                           ),
                         ],
