@@ -50,6 +50,7 @@ dependencies:
   flutter_webrtc: 0.13.1
   logger: ^2.0.1
   file_picker: ^10.1.4
+  docx_to_text: ^1.0.1
 
 dev_dependencies:
   flutter_test:

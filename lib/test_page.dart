@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:convert'; // Import dart:convert for jsonEncode
 import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http; // Already imported
 import 'package:logger/logger.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+// Chuyển thành StatefulWidget
 class TestPage extends StatefulWidget {
   const TestPage({Key? key}) : super(key: key);
 
@@ -14,7 +15,9 @@ class TestPage extends StatefulWidget {
   State<TestPage> createState() => _TestPageState();
 }
 
+// Tạo State class tương ứng
 class _TestPageState extends State<TestPage> {
+  // --- State variables (unchanged) ---
   final Logger _logger = Logger();
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   RTCPeerConnection? _peerConnection;
@@ -34,13 +37,11 @@ class _TestPageState extends State<TestPage> {
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
-  String _lastWords = ''; // Sẽ lưu trữ kết quả nhận dạng gần nhất
+  String _lastWords = '';
   final String _userId = 'flutter_user_test_001';
   final String _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
   bool _isSendingToBot = false;
-
-  // Cờ mới để quản lý việc xử lý kết quả cuối cùng
-  bool _hasProcessedFinalWords = false;
+  // ------------------------------------
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _TestPageState extends State<TestPage> {
     _initSpeech();
   }
 
+  // --- _initializeRenderer, _initSpeech, dispose, _connect, _disconnect, setStateIfNotDisposed (unchanged) ---
   Future<void> _initializeRenderer() async {
     await _renderer.initialize();
   }
@@ -58,8 +60,6 @@ class _TestPageState extends State<TestPage> {
       bool available = await _speechToText.initialize(
         onStatus: _onSpeechStatus,
         onError: _onSpeechError,
-        debugLogging:
-            true, // Bật debug logging của plugin để xem thêm thông tin
       );
       if (mounted) {
         setStateIfNotDisposed(() {
@@ -105,7 +105,7 @@ class _TestPageState extends State<TestPage> {
     _peerConnection?.dispose();
     _chatController.dispose();
     _scrollController.dispose();
-    _speechToText.cancel(); // Đảm bảo speech_to_text được dừng và hủy
+    _speechToText.cancel();
     super.dispose();
   }
 
@@ -121,7 +121,7 @@ class _TestPageState extends State<TestPage> {
 
     try {
       _peerConnection = await createPeerConnection({
-        'iceServers': [], // Add STUN/TURN servers if needed
+        'iceServers': [],
         'sdpSemantics': 'unified-plan',
       }, {});
 
@@ -133,56 +133,78 @@ class _TestPageState extends State<TestPage> {
         _renderer.srcObject = _remoteStream;
       });
 
+      // --- PeerConnection event handlers (onTrack, onIceCandidate, onIceConnectionState, onConnectionState) ---
+      // (Assume these are the same as in the previous version for brevity)
       _peerConnection!.onTrack = (RTCTrackEvent event) {
         _logger.i(
-          "Track received: kind=${event.track.kind}, id=${event.track.id}, streamIds: ${event.streams.map((s) => s.id).join(', ')}",
+          "Track received: kind=${event.track.kind}, id=${event.track.id}",
         );
         if (event.streams.isEmpty) {
-          _logger.w(
-            "Track received but event.streams is empty! Manually adding to _remoteStream.",
-          );
-          if (_remoteStream != null && mounted) {
+          _logger.w("Track received but event.streams is empty!");
+          if (_remoteStream != null &&
+              !_remoteStream!.getTracks().any((t) => t.id == event.track.id)) {
+            _logger.i(
+              "Manually adding track ${event.track.id} to _remoteStream",
+            );
             _remoteStream?.addTrack(event.track);
-            setStateIfNotDisposed(() => _renderer.srcObject = _remoteStream);
+            setStateIfNotDisposed(() {
+              _renderer.srcObject = _remoteStream;
+            });
           }
           return;
         }
 
         final stream = event.streams[0];
+
         if (event.track.kind == 'video' || event.track.kind == 'audio') {
           _logger.i(
             "--> Received ${event.track.kind?.toUpperCase()} track: ${event.track.id} for stream: ${stream.id}",
           );
-          if (_remoteStream != null) {
-            // Check if track already exists to prevent duplicates if onTrack is called multiple times for the same track
+          if (_remoteStream != null && stream.id == _remoteStream!.id) {
             if (!_remoteStream!.getTracks().any(
               (t) => t.id == event.track.id,
             )) {
+              _logger.i("Adding track ${event.track.id} to _remoteStream");
               _remoteStream?.addTrack(event.track);
             }
-            if (mounted) {
-              setStateIfNotDisposed(() {
-                _renderer.srcObject = _remoteStream;
-              });
-            }
+          } else if (_remoteStream != null) {
+            _logger.w(
+              "Received track for a different stream ID (${stream.id}) than expected (${_remoteStream!.id}). Adding anyway.",
+            );
+            _remoteStream?.addTrack(event.track);
+          } else {
+            _logger.e("Received track but _remoteStream is null!");
+            return;
           }
         }
+
         event.track.onUnMute = () {
           _logger.i("Track unmuted: ${event.track.id}");
           if (mounted && _remoteStream != null) {
-            setState(() => _renderer.srcObject = _remoteStream);
+            setState(() {
+              _renderer.srcObject = _remoteStream;
+            });
           }
         };
+
         event.track.onEnded = () {
           _logger.w("Track ended: ${event.track.id}");
           if (_remoteStream != null) {
             _remoteStream!.removeTrack(event.track);
             if (mounted) {
-              setState(() => _renderer.srcObject = _remoteStream);
+              setState(() {
+                _renderer.srcObject = _remoteStream;
+              });
             }
           }
         };
         event.track.onMute = () => _logger.w("Track muted: ${event.track.id}");
+
+        if (mounted && _remoteStream != null) {
+          setState(() {
+            _renderer.srcObject = _remoteStream;
+          });
+        }
       };
 
       _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
@@ -214,12 +236,9 @@ class _TestPageState extends State<TestPage> {
               break;
             case RTCIceConnectionState.RTCIceConnectionStateDisconnected:
               _status = 'Disconnected';
-              // Consider if a disconnect here should also trigger _disconnect()
-              // _disconnect();
               break;
             case RTCIceConnectionState.RTCIceConnectionStateClosed:
               _status = 'Closed';
-              // _disconnect();
               break;
             default:
               _status = state.toString().split('.').last;
@@ -239,6 +258,7 @@ class _TestPageState extends State<TestPage> {
           });
         }
       };
+      //----------------------------------------------------------------------
 
       await _peerConnection!.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
@@ -306,8 +326,7 @@ class _TestPageState extends State<TestPage> {
       setStateIfNotDisposed(() {
         _isLoading = false;
         if (_status == 'Connecting...' && _errorMessage == null) {
-          // This might be too optimistic if setRemoteDescription hasn't completed successfully yet
-          // _status = 'Negotiating...'; // Status will be updated by ICE/PeerConnection states
+          _status = 'Negotiating...';
         }
       });
     }
@@ -315,11 +334,9 @@ class _TestPageState extends State<TestPage> {
 
   Future<void> _disconnect() async {
     _logger.i("Disconnecting...");
-    if ((_status == 'Disconnecting...' || _status == 'Disconnected') &&
-        _peerConnection == null) {
-      _logger.w("Already disconnected or not connected.");
-      // Ensure UI is consistent
-      if (_status != 'Disconnected') {
+    if (_status == 'Disconnecting...' || _peerConnection == null) {
+      _logger.w("Already disconnecting or not connected.");
+      if (_peerConnection == null && _status != 'Disconnected') {
         setStateIfNotDisposed(() {
           _status = 'Disconnected';
           _isLoading = false;
@@ -332,26 +349,37 @@ class _TestPageState extends State<TestPage> {
 
     setStateIfNotDisposed(() {
       _status = 'Disconnecting...';
-      _isLoading = true; // Can set to true to show an indicator during cleanup
+      _isLoading = true;
     });
 
+    List<MediaStreamTrack> tracksToStop = [];
+    if (_remoteStream != null) {
+      try {
+        tracksToStop.addAll(_remoteStream!.getTracks());
+      } catch (e) {
+        _logger.w(
+          "Error getting tracks from remoteStream during disconnect: $e",
+        );
+      }
+    }
+
     try {
-      // Stop speech recognition if it's active
-      if (_isListening || _speechToText.isListening) {
-        await _speechToText.stop();
-        _logger.i("Speech recognition stopped during disconnect.");
+      if (tracksToStop.isNotEmpty) {
+        _logger.i("Stopping ${tracksToStop.length} track(s)...");
+        await Future.wait(
+          tracksToStop.map((track) async {
+            try {
+              _logger.i("Stopping track: ${track.id} (${track.kind})");
+              await track.stop();
+              _logger.i("Track ${track.id} stopped.");
+            } catch (e) {
+              _logger.w("Error stopping track ${track.id}: $e");
+            }
+          }),
+        );
       }
 
       if (_remoteStream != null) {
-        for (var track in _remoteStream!.getTracks()) {
-          try {
-            _logger.i("Stopping track: ${track.id} (${track.kind})");
-            await track.stop();
-            _logger.i("Track ${track.id} stopped.");
-          } catch (e) {
-            _logger.w("Error stopping track ${track.id}: $e");
-          }
-        }
         try {
           await _remoteStream!.dispose();
           _logger.i("Remote stream disposed.");
@@ -368,9 +396,8 @@ class _TestPageState extends State<TestPage> {
         } catch (e) {
           _logger.w("Error closing peer connection: $e");
         }
-        // Add a small delay before disposing, sometimes helpful
-        await Future.delayed(const Duration(milliseconds: 100));
         try {
+          await Future.delayed(const Duration(milliseconds: 100));
           await _peerConnection!.dispose();
           _logger.i("Peer connection disposed.");
         } catch (e) {
@@ -382,7 +409,11 @@ class _TestPageState extends State<TestPage> {
       if (mounted) {
         _renderer.srcObject = null;
         _logger.i("Renderer srcObject set to null.");
+      } else {
+        _logger.w("Widget unmounted before renderer could be cleared.");
       }
+
+      _logger.i("Disconnected process finished.");
     } catch (e, s) {
       _logger.e("Error during disconnection steps", error: e, stackTrace: s);
     } finally {
@@ -390,13 +421,10 @@ class _TestPageState extends State<TestPage> {
         _status = 'Disconnected';
         _isLoading = false;
         _errorMessage = null;
-        _isListening = false; // Ensure listening state is false
-        _hasProcessedFinalWords = false; // Reset for next potential connection
         if (mounted && _renderer.srcObject != null) {
-          _renderer.srcObject = null; // Ensure renderer is cleared
+          _renderer.srcObject = null;
         }
       });
-      _logger.i("Disconnected process finished.");
     }
   }
 
@@ -407,7 +435,9 @@ class _TestPageState extends State<TestPage> {
       _logger.w("Tried to call setState on a disposed widget.");
     }
   }
+  // ---------------------------------------------------------------------------
 
+  // Hàm xử lý gửi tin nhắn (từ text input)
   void _sendMessage() {
     final text = _chatController.text.trim();
     if (text.isNotEmpty) {
@@ -418,202 +448,96 @@ class _TestPageState extends State<TestPage> {
     }
   }
 
-  // --- Speech-to-Text methods ---
+  // --- Speech-to-Text methods (_onSpeechStatus, _onSpeechError, _onSpeechResult, _startListening, _stopListening, _handleMicTap) ---
+  // (Assume these are the same as in the previous version for brevity)
   void _onSpeechStatus(String status) {
-    _logger.i(
-      "Speech status: '$status'. Widget _isListening: $_isListening. Plugin.isListening: ${_speechToText.isListening}. _lastWords: '$_lastWords'. _hasProcessedFinalWords: $_hasProcessedFinalWords",
-    );
-
-    if (!mounted) {
-      _logger.w("onSpeechStatus: Widget not mounted. Status: $status");
-      return;
-    }
-
-    bool pluginIsActuallyListening = _speechToText.isListening;
-
-    // Fallback: Nếu listening dừng lại VÀ chưa xử lý từ final trong onResult VÀ _lastWords có nội dung
-    // This can happen if listening stops abruptly or if finalResult=true was missed.
-    if (!pluginIsActuallyListening &&
-        !_hasProcessedFinalWords &&
-        _lastWords.isNotEmpty) {
-      _logger.w(
-        "FALLBACK in onSpeechStatus: Listening stopped (status: $status), final words were NOT processed via onResult. Processing _lastWords ('$_lastWords') now.",
-      );
-      String wordsToProcess = _lastWords; // Capture before clearing
-      _hasProcessedFinalWords = true; // Mark as processed to prevent duplicates
-      _lastWords = ''; // Clear immediately
-
-      _addMessageToList("You (voice): $wordsToProcess");
-      _sendToChatbot(wordsToProcess);
-    }
-
-    // Luôn đồng bộ trạng thái _isListening của widget với plugin
-    if (_isListening != pluginIsActuallyListening) {
+    _logger.i("Speech status changed: $status");
+    bool listening = status == 'listening';
+    if (_isListening != listening && mounted) {
       setStateIfNotDisposed(() {
-        _isListening = pluginIsActuallyListening;
-        _logger.i(
-          "Widget _isListening state synced to $pluginIsActuallyListening.",
-        );
-      });
-    }
-
-    // Clean up _lastWords if listening has stopped and words were already processed.
-    if (!pluginIsActuallyListening &&
-        _hasProcessedFinalWords &&
-        _lastWords.isNotEmpty) {
-      _logger.d(
-        "onSpeechStatus: Listening stopped, final words were processed. Clearing residual _lastWords ('$_lastWords').",
-      );
-      _lastWords = '';
-    }
-  }
-
-  void _onSpeechError(dynamic errorNotification) {
-    _logger.e(
-      "Speech error: ${errorNotification.errorMsg} - permanent: ${errorNotification.permanent}",
-    );
-    if (mounted) {
-      setStateIfNotDisposed(() {
-        _isListening = false; // Ensure listening state is false
-        _addMessageToList(
-          "Bot: Speech recognition error: ${errorNotification.errorMsg}",
-        );
-        // Reset flags if error is permanent, allowing a fresh start for next attempt
-        if (errorNotification.permanent ?? true) {
-          _hasProcessedFinalWords = false;
+        _isListening = listening;
+        if (!_isListening && _lastWords.isNotEmpty) {
+          _logger.i("Speech recognition finished. Recognized: $_lastWords");
+          // Add recognized text to chat list
+          // _addMessageToList("You (voice): $_lastWords");
+          // Send to chatbot
+          // _sendToChatbot(_lastWords);
+          _lastWords = '';
+        } else if (!_isListening) {
+          _logger.i(
+            "Speech recognition stopped without results or already processed.",
+          );
           _lastWords = '';
         }
       });
     }
   }
 
+  void _onSpeechError(dynamic errorNotification) {
+    _logger.e("Speech error: ${errorNotification.errorMsg}");
+    setStateIfNotDisposed(() {
+      _isListening = false;
+      _lastWords = '';
+      _addMessageToList(
+        "Bot: Speech recognition error: ${errorNotification.errorMsg}",
+      );
+    });
+  }
+
   void _onSpeechResult(SpeechRecognitionResult result) {
     _logger.d(
-      "Speech result: '${result.recognizedWords}', final: ${result.finalResult}, current _hasProcessedFinalWords: $_hasProcessedFinalWords",
+      "Speech result: ${result.recognizedWords}, final: ${result.finalResult}",
     );
 
-    // Always update _lastWords with the latest recognized words from the plugin.
-    // This is important for the fallback logic in _onSpeechStatus.
-    _lastWords = result.recognizedWords;
+    setStateIfNotDisposed(() {
+      _lastWords =
+          result.recognizedWords; // Update with the full recognized words
+    });
 
-    // If this is the final result AND it has content AND it hasn't been processed yet
-    if (result.finalResult &&
-        result.recognizedWords.isNotEmpty &&
-        !_hasProcessedFinalWords) {
-      _logger.i(
-        "PRIMARY PROCESSING in onResult: Final recognized words: '${result.recognizedWords}'. Processing now.",
-      );
-
-      String finalWords = result.recognizedWords;
-      _hasProcessedFinalWords =
-          true; // Mark as processed IMMEDIATELY to prevent re-entry
-
-      _addMessageToList("You (voice): $finalWords");
-      _sendToChatbot(finalWords);
-
-      // Clear _lastWords after processing, as 'finalWords' holds the definitive text for this utterance.
-      // This is a secondary safety measure; _hasProcessedFinalWords is the primary guard.
-      _lastWords = '';
+    if (result.finalResult) {
+      // Only process the final result when speech is complete
+      _addMessageToList("You (voice): $_lastWords");
+      _sendToChatbot(_lastWords); // Send full recognized sentence to chatbot
     }
   }
 
   Future<void> _startListening() async {
-    if (!_speechEnabled || _isListening) {
-      _logger.i(
-        "Start listening called but speech not enabled or already listening (widget state: $_isListening, plugin state: ${_speechToText.isListening}).",
-      );
-      // If widget state is true but plugin is not, sync it.
-      if (_isListening && !_speechToText.isListening && mounted) {
-        setStateIfNotDisposed(() {
-          _isListening = false;
-        });
-      }
-      return;
-    }
-    _logger.i("Attempting to start speech recognition...");
-
-    _lastWords = ''; // Clear any stale words from previous sessions
-    _hasProcessedFinalWords = false; // Reset flag for the new speaking session
-
+    if (!_speechEnabled || _isListening) return;
+    _logger.i("Starting speech recognition...");
+    _lastWords = '';
     try {
       await _speechToText.listen(
         onResult: _onSpeechResult,
-        localeId: 'en_US', // Or use a specific locale like 'vi_VN'
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(
-          seconds: 3,
-        ), // Consider adjusting this based on testing
+        localeId: 'en_US', // English locale
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 4),
         partialResults: true,
-        cancelOnError: true, // Stop listening on error
-        listenMode:
-            ListenMode.confirmation, // Or other modes like ListenMode.search
+        cancelOnError: true,
+        listenMode: ListenMode.confirmation,
       );
       setStateIfNotDisposed(() {
-        _isListening = true; // Reflect that we've initiated listening
+        _isListening = true;
       });
-      _logger.i("Speech recognition started listening.");
-    } catch (e, s) {
-      _logger.e("Error starting speech recognition", error: e, stackTrace: s);
-      if (mounted) {
-        setStateIfNotDisposed(() {
-          _isListening = false;
-          _hasProcessedFinalWords =
-              false; // Ensure flag is reset on failed start
-        });
-      }
+    } catch (e) {
+      _logger.e("Error starting speech recognition: $e");
+      setStateIfNotDisposed(() {
+        _isListening = false;
+      });
     }
   }
 
   Future<void> _stopListening() async {
-    if (!_speechEnabled) {
-      _logger.w("Attempted to stop listening, but speech is not enabled.");
-      return;
-    }
-
-    // Check the plugin's actual listening state
-    if (!_speechToText.isListening) {
-      _logger.i(
-        "Stop listening called, but plugin reports it's already not listening.",
-      );
-      if (_isListening && mounted) {
-        // If widget state is out of sync
-        setStateIfNotDisposed(() {
-          _isListening = false; // Sync widget state
-        });
-      }
-      // Fallback in _onSpeechStatus might handle any pending _lastWords if a 'done' status comes.
-      // Or if _lastWords has content and _hasProcessedFinalWords is false.
-      // Consider if a manual check/process is needed here if no further status update is guaranteed.
-      // For now, rely on onStatus.
-      return;
-    }
-
-    _logger.i(
-      "Manually stopping speech recognition via _speechToText.stop()...",
-    );
+    if (!_speechToText.isListening) return;
+    _logger.i("Manually stopping speech recognition...");
     try {
       await _speechToText.stop();
-      _logger.i(
-        "speechToText.stop() successfully called. Waiting for _onSpeechStatus callback to finalize.",
-      );
-      // _onSpeechStatus will be triggered by the plugin, which should then update _isListening
-      // and handle any final processing via its fallback logic if needed.
-    } catch (e, s) {
-      _logger.e("Error calling _speechToText.stop()", error: e, stackTrace: s);
-      if (mounted) {
-        setStateIfNotDisposed(() {
-          _isListening = false; // Ensure UI reflects not listening
-          // Check if there are unprocessed words on error
-          if (!_hasProcessedFinalWords && _lastWords.isNotEmpty) {
-            _addMessageToList("Bot: Error stopping. Partial: $_lastWords");
-            _hasProcessedFinalWords =
-                true; // Mark as "handled" (via error message)
-          } else {
-            _addMessageToList("Bot: Error stopping speech recognition.");
-          }
-          _lastWords = ''; // Clear any remnants
-        });
-      }
+      // onStatus callback handles state and processing
+    } catch (e) {
+      _logger.e("Error stopping speech recognition: $e");
+      setStateIfNotDisposed(() {
+        _isListening = false;
+        _lastWords = '';
+      });
     }
   }
 
@@ -631,16 +555,17 @@ class _TestPageState extends State<TestPage> {
       return;
     }
 
-    // Use the plugin's state as the source of truth for toggling
     if (_speechToText.isListening) {
-      _logger.i("Mic tapped: Stopping listening (plugin is active).");
+      _logger.i("Mic tapped: Stopping listening.");
       _stopListening();
     } else {
-      _logger.i("Mic tapped: Starting listening (plugin is not active).");
+      _logger.i("Mic tapped: Starting listening.");
       _startListening();
     }
   }
+  // ---------------------------------------------------------------------------
 
+  // --- Function to send text to chatbot API ---
   Future<void> _sendToChatbot(String inputText) async {
     if (inputText.isEmpty || _isSendingToBot) {
       _logger.w("Skipping chatbot request: Empty input or already sending.");
@@ -681,7 +606,12 @@ class _TestPageState extends State<TestPage> {
           final String? botReply = jsonResponse['response'] as String?;
 
           if (botReply != null && botReply.isNotEmpty) {
+            // Add the bot's reply to the UI first
             _addMessageToList("Bot: $botReply");
+
+            // *******************************************************
+            // * NEW: Call the second API with the bot's response    *
+            // *******************************************************
             await _sendResponseToAldaBackend(botReply);
           } else {
             _logger.w("Chatbot response field is missing or empty.");
@@ -709,54 +639,68 @@ class _TestPageState extends State<TestPage> {
       });
     }
   }
+  // ---------------------------------------------
 
+  // --- NEW: Function to send bot response to Alda Backend API ---
   Future<void> _sendResponseToAldaBackend(String botReplyText) async {
     final String aldaUrl =
         'https://aitools.ptit.edu.vn/alda_backend/human'; // Second API URL
     _logger.i("Sending bot response to Alda Backend: $aldaUrl");
 
     try {
+      // Prepare JSON body
       final Map<String, String> requestBody = {
-        'text': botReplyText,
-        'type': 'echo',
+        'text': botReplyText, // The bot's answer
+        'type': 'echo', // Fixed type as requested
       };
       final String encodedBody = jsonEncode(requestBody);
 
-      _logger.d("Alda Backend Payload: $encodedBody");
+      _logger.d("Alda Backend Payload: $encodedBody"); // Log the payload
 
+      // Make the POST request
       final response = await http
           .post(
             Uri.parse(aldaUrl),
-            headers: {'Content-Type': 'application/json; charset=UTF-8'},
-            body: encodedBody,
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+            }, // Set content type header
+            body: encodedBody, // Send encoded JSON string
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 15)); // Add a timeout
 
+      // Check the response status from the second API
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _logger.i(
           "Successfully sent response to Alda Backend. Status: ${response.statusCode}",
         );
+        // You can log the response body if needed:
+        // _logger.d("Alda Backend Response Body: ${response.body}");
       } else {
         _logger.e(
           "Failed to send response to Alda Backend. Status: ${response.statusCode}, Body: ${response.body}",
         );
+        // No user-facing error message here, just logging the failure.
       }
     } on TimeoutException catch (e) {
       _logger.e("Timeout sending response to Alda Backend: $e");
+      // Handle timeout specifically if needed
     } catch (e, s) {
       _logger.e(
         "Error sending response to Alda Backend",
         error: e,
         stackTrace: s,
       );
+      // Handle other potential errors (network issues, etc.)
     }
+    // This function doesn't update the UI directly.
   }
+  // -------------------------------------------------------------
 
+  // --- Helper to add message and scroll ---
   void _addMessageToList(String message, {bool temporary = false}) {
     setStateIfNotDisposed(() {
       _messages.add(message);
     });
-    // Scroll to the bottom after a short delay to allow the ListView to update
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -767,9 +711,13 @@ class _TestPageState extends State<TestPage> {
       }
     });
   }
+  // -------------------------------------------
 
+  // --- Build method (Assume mostly unchanged from previous version) ---
   @override
   Widget build(BuildContext context) {
+    // (Structure remains the same: Scaffold, AppBar, Column with Video/Controls/Chat)
+    // (RTCVideoView, Buttons, ListView.builder, TextField, FAB etc. are kept as before)
     return Scaffold(
       appBar: AppBar(
         title: const Text("Video Stream & Chat"),
@@ -793,6 +741,7 @@ class _TestPageState extends State<TestPage> {
       body: SafeArea(
         child: Column(
           children: [
+            // Video Stream Section
             Expanded(
               flex: 3,
               child: Padding(
@@ -808,8 +757,8 @@ class _TestPageState extends State<TestPage> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        if (_renderer.textureId != null &&
-                            _renderer.srcObject?.active == true)
+                        // Video View
+                        if (_renderer.textureId != null)
                           RTCVideoView(
                             _renderer,
                             mirror: false,
@@ -818,24 +767,21 @@ class _TestPageState extends State<TestPage> {
                                     .RTCVideoViewObjectFitContain,
                           )
                         else
-                          Center(
+                          const Center(
                             child: Text(
-                              _renderer.textureId == null
-                                  ? "Initializing Renderer..."
-                                  : "Stream not active or ended",
+                              "Initializing Renderer...",
                               style: TextStyle(color: Colors.white54),
                             ),
                           ),
-                        if (_isLoading &&
-                            (_status.contains('Connecting') ||
-                                _status.contains('Negotiating')))
+                        // Loading & Status Overlays
+                        if (_isLoading && _status.contains('Connecting'))
                           const CircularProgressIndicator(),
                         if (!_isLoading &&
                             _status != 'Connected' &&
                             _status != 'Checking...' &&
-                            !_status.contains('Connecting') && // Added this
-                            !_status.contains('Negotiating')) // Added this
+                            _status != 'Negotiating...')
                           Positioned(
+                            // Status text
                             bottom: 10,
                             left: 10,
                             right: 10,
@@ -860,7 +806,7 @@ class _TestPageState extends State<TestPage> {
                               ),
                             ),
                           ),
-                        if (_isListening)
+                        if (_isListening) // Listening indicator
                           Positioned(
                             top: 10,
                             right: 10,
@@ -883,6 +829,7 @@ class _TestPageState extends State<TestPage> {
                 ),
               ),
             ),
+            // Control Buttons Section
             Padding(
               padding: const EdgeInsets.symmetric(
                 vertical: 5.0,
@@ -903,15 +850,9 @@ class _TestPageState extends State<TestPage> {
                               ),
                             )
                             : const Icon(Icons.play_arrow),
-                    label: const Text('Start to call'),
+                    label: const Text('Start Play'),
                     onPressed:
-                        (_isLoading ||
-                                (_peerConnection != null &&
-                                    _status != 'Disconnected' &&
-                                    _status != 'Failed' &&
-                                    _status != 'Error' &&
-                                    _status !=
-                                        'Closed')) // More precise condition
+                        (_isLoading || _peerConnection != null)
                             ? null
                             : _connect,
                     style: ElevatedButton.styleFrom(
@@ -921,23 +862,11 @@ class _TestPageState extends State<TestPage> {
                   ),
                   const SizedBox(width: 20),
                   ElevatedButton.icon(
-                    icon:
-                        _isLoading && _status == 'Disconnecting...'
-                            ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : const Icon(Icons.stop),
+                    icon: const Icon(Icons.stop),
                     label: const Text('Stop'),
                     onPressed:
                         (_isLoading && _status == 'Disconnecting...') ||
-                                _peerConnection == null ||
-                                _status == 'Disconnected' ||
-                                _status == 'Closed'
+                                _peerConnection == null
                             ? null
                             : _disconnect,
                     style: ElevatedButton.styleFrom(
@@ -948,6 +877,7 @@ class _TestPageState extends State<TestPage> {
                 ],
               ),
             ),
+            // Chat Section
             Expanded(
               flex: 2,
               child: Container(
@@ -970,6 +900,7 @@ class _TestPageState extends State<TestPage> {
                 ),
                 child: Column(
                   children: [
+                    // Message List Area
                     Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
@@ -1007,7 +938,6 @@ class _TestPageState extends State<TestPage> {
                             textColor = Colors.black87;
                             displayMessage = message.substring("Bot: ".length);
                           } else {
-                            // System or initial messages
                             alignment = Alignment.center;
                             bubbleColor = Colors.grey[300]!;
                             textColor = Colors.black54;
@@ -1042,6 +972,7 @@ class _TestPageState extends State<TestPage> {
                         },
                       ),
                     ),
+                    // Bot thinking indicator
                     if (_isSendingToBot)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 4.0),
@@ -1066,6 +997,7 @@ class _TestPageState extends State<TestPage> {
                         ),
                       ),
                     Divider(height: 1, color: Colors.grey[400]),
+                    // Message Input Area
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8.0,
@@ -1118,7 +1050,7 @@ class _TestPageState extends State<TestPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: (_speechEnabled && !_isSendingToBot) ? _handleMicTap : null,
         backgroundColor:
-            _isListening // Use widget's _isListening for FAB color
+            _isListening
                 ? Colors.redAccent
                 : (_speechEnabled ? Colors.blueGrey[600] : Colors.grey),
         tooltip: _isListening ? 'Stop listening' : 'Tap to speak',
@@ -1132,8 +1064,10 @@ class _TestPageState extends State<TestPage> {
         shape: const CircularNotchedRectangle(),
         notchMargin: 6.0,
         color: Colors.blueGrey[800],
-        child: Container(height: 40.0), // Consistent height
+        child: Container(height: 40.0),
       ),
     );
   }
+
+  //--------------------------------------------------------------------
 }
