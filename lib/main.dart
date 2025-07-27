@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:fluttericon/mfg_labs_icons.dart';
 import 'chat_page.dart';
 import 'voice_page.dart';
 import 'home_page.dart'; // Import trang HomePage
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('vi_VN', null);
   runApp(LoginApp());
 }
 
@@ -39,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
     String password = _passwordController.text;
 
     // Kiểm tra tên đăng nhập và mật khẩu cố định
-    if (username == 'hung123' && password == '12345') {
+    if (username == '' && password == '') {
       print('Đăng nhập thành công!');
       // Thực hiện hành động khi đăng nhập thành công, chuyển đến trang chính của ứng dụng
       Navigator.pushReplacement(
