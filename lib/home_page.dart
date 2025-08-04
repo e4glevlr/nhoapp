@@ -1,10 +1,65 @@
 import 'package:flutter/material.dart';
 import 'chat_page.dart';
-// import 'voice_page.dart'; // Bạn không cần import voice_page nếu không dùng nữa
-import 'test_page.dart'; // Đảm bảo import này đúng
-import 'documents_page.dart'; // <<-- thêm import
+import 'test_page.dart'; 
+import 'documents_page.dart';
+import 'profile_page.dart';
+import 'notifications_page.dart';
+import 'settings_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _pages = [
+    HomePageContent(),
+    ProfilePage(),
+    NotificationsPage(),
+    SettingsPage(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Trang chủ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Hồ sơ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Thông báo',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Cài đặt',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.green,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
+
+class HomePageContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -12,13 +67,11 @@ class HomePage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // App Bar with settings
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Bạn có thể thêm các nút hoặc icon vào đây
                 ],
               ),
             ),
@@ -32,7 +85,6 @@ class HomePage extends StatelessWidget {
                     children: [
                       SizedBox(height: 20),
 
-                      // Doctor AI Card - Chat
                       Container(
                         padding: EdgeInsets.all(20),
                         width: double.infinity,
@@ -97,7 +149,7 @@ class HomePage extends StatelessWidget {
                               clipBehavior: Clip.none,
                               children: [
                                 Image.asset(
-                                  'images/robot.png', // Make sure to have this image in your assets
+                                  'images/robot.png', 
                                   width: 100,
                                   height: 120,
                                   fit: BoxFit.contain,
@@ -128,7 +180,6 @@ class HomePage extends StatelessWidget {
 
                       SizedBox(height: 30),
 
-                      // Voice AI Card - ĐÃ SỬA ĐỔI
                       Container(
                         padding: EdgeInsets.all(20),
                         width: double.infinity,
@@ -164,12 +215,9 @@ class HomePage extends StatelessWidget {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          // --- THAY ĐỔI Ở ĐÂY ---
                                           builder:
                                               (context) =>
-                                                  TestPage(), // Chuyển đến TestPage
-                                          // builder: (context) => VoiceChatPage(), // Code cũ
-                                          // ---------------------
+                                                  TestPage(),
                                         ),
                                       );
                                     },
@@ -224,7 +272,6 @@ class HomePage extends StatelessWidget {
 
                       SizedBox(height: 30),
 
-                      // Emergency Services
                       Row(
                         children: [
                           Expanded(
@@ -235,7 +282,7 @@ class HomePage extends StatelessWidget {
                                   MaterialPageRoute(
                                     builder:
                                         (context) =>
-                                            TestPage(), // Nút này cũng đang trỏ đến TestPage
+                                            TestPage(),
                                   ),
                                 );
                               },
@@ -283,55 +330,10 @@ class HomePage extends StatelessWidget {
 
                       SizedBox(
                         height: 30,
-                      ), // Giảm khoảng cách để phù hợp với nội dung mới
+                      ),
                     ],
                   ),
                 ),
-              ),
-            ),
-
-            // Bottom Navigation Bar
-            Container(
-              padding: EdgeInsets.symmetric(vertical: 15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: Offset(0, -1),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(
-                    Icons.home_outlined,
-                    "Trang chủ",
-                    Colors.green,
-                    true,
-                  ),
-                  _buildNavItem(
-                    Icons.person_outlined,
-                    "Hồ sơ",
-                    Colors.blue,
-                    false,
-                  ), // Thêm nút voice ở navigation bar
-                  _buildNavItem(
-                    Icons.notifications_outlined,
-                    "Thông báo",
-                    Colors.yellow,
-                    false,
-                  ),
-                  _buildNavItem(
-                    Icons.settings_outlined,
-                    "Cài đặt",
-                    Colors.grey,
-                    false,
-                  ),
-                ],
               ),
             ),
           ],
@@ -368,7 +370,7 @@ class HomePage extends StatelessWidget {
           Text(
             title,
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center, // Căn giữa text nếu dài
+            textAlign: TextAlign.center,
           ),
           SizedBox(height: 5),
           Text(
@@ -381,39 +383,6 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildNavItem(
-    IconData icon,
-    String label,
-    Color color,
-    bool isActive,
-  ) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          color: isActive ? color : Colors.grey,
-          size: 24,
-        ), // Thay đổi màu icon dựa trên isActive
-        SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color:
-                isActive
-                    ? color
-                    : Colors.grey, // Thay đổi màu text dựa trên isActive
-            fontSize: 12,
-            fontWeight:
-                isActive
-                    ? FontWeight.bold
-                    : FontWeight.normal, // Làm đậm nếu active
-          ),
-        ),
-      ],
     );
   }
 }
