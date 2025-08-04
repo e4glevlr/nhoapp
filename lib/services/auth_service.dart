@@ -66,4 +66,9 @@ class AuthService {
       print('Lỗi đăng xuất: $e');
     }
   }
+
+  // Lấy người dùng hiện tại
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
 }
