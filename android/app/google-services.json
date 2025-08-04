@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "47901490813",
+    "project_id": "bealda-6e7f1",
+    "storage_bucket": "bealda-6e7f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:47901490813:android:0d2b4e67ed1b3e8be8fb14",
+        "android_client_info": {
+          "package_name": "com.example.gioapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDODJiBMDsjrYqXGDKTBcVOSv5p169bsI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
