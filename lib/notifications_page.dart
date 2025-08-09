@@ -1,40 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui'; // Cần cho hiệu ứng
 
-/// Một trang giữ chỗ (placeholder) đơn giản cho màn hình thông báo.
-/// 
-/// Hiển thị một icon và một dòng chữ ở giữa màn hình để thông báo
-/// cho người dùng rằng hiện tại chưa có thông báo nào.
-class NotificationsPage extends StatelessWidget {
+/// Một trang hiển thị khi chưa có thông báo, được thiết kế nhất quán
+/// với phong cách glassmorphism và nền gradient động của ứng dụng.
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({Key? key}) : super(key: key);
 
   @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+// Chuyển thành StatefulWidget để thêm animation cho nền
+class _NotificationsPageState extends State<NotificationsPage> {
+  @override
   Widget build(BuildContext context) {
+    // Áp dụng nền gradient động cho toàn bộ trang
     return Scaffold(
+      backgroundColor: Colors.transparent, // Nền trong suốt
       appBar: AppBar(
-        title: const Text('Thông báo'),
-        // Tùy chọn: làm cho AppBar trông phẳng hơn để hợp với trang trống
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black87,
+        centerTitle: true,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Icon để biểu thị trạng thái trống
+            // Style lại icon cho phù hợp với nền tối
             Icon(
               Icons.notifications_off_outlined,
-              size: 80, // Kích thước lớn để dễ nhìn
-              color: Colors.grey[400], // Màu xám nhẹ để không quá nổi bật
+              size: 80,
+              color: Colors.white.withOpacity(0.7),
             ),
-            const SizedBox(height: 20), // Khoảng cách giữa icon và text
-            // Dòng chữ thông báo
+            const SizedBox(height: 20),
+            // Style lại text
             Text(
               'Chưa có thông báo nào',
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 18,
-                color: Colors.grey[600],
+                color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),

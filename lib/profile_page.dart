@@ -1,93 +1,66 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb; // Thêm import này
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart'; // Thêm import
+import 'dart:ui'; // Thêm import
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
-// Import các trang khác và service
+import 'components/GlassmorphicToggle.dart';
 import 'services/auth_service.dart';
-// import 'edit_profile_page.dart'; // Trang này bạn sẽ tạo sau
+
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
-
+  final double cornerRadius = 16.0;
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isUploading = false;
-
-  // Hàm để xử lý việc chọn và tải ảnh lên
+  // Toàn bộ logic xử lý dữ liệu của bạn được giữ nguyên
   Future<void> _changeAvatar() async {
-    // Kiểm tra widget còn tồn tại không
+    // ... logic giữ nguyên
     if (!mounted) return;
     final authService = Provider.of<AuthService>(context, listen: false);
-    // *** SỬA ĐỔI Ở ĐÂY ***
     final user = authService.getCurrentUser();
     if (user == null) return;
 
     final imagePicker = ImagePicker();
-    // Cho người dùng chọn ảnh từ thư viện
     final pickedFile = await imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 70);
 
     if (pickedFile != null) {
       setState(() => _isUploading = true);
-
       try {
-        // Tạo tham chiếu đến Firebase Storage
         final storageRef = FirebaseStorage.instance.ref().child('avatars/${user.uid}');
-
-        // *** LOGIC XỬ LÝ ĐA NỀN TẢNG (WEB VÀ MOBILE) ***
         if (kIsWeb) {
-          // Nếu là web, đọc dữ liệu ảnh và dùng putData
           await storageRef.putData(await pickedFile.readAsBytes());
         } else {
-          // Nếu là mobile, dùng putFile
           await storageRef.putFile(File(pickedFile.path));
         }
-
-        // Lấy URL tải xuống của ảnh
         final downloadUrl = await storageRef.getDownloadURL();
-
-        // Cập nhật URL vào Firestore và FirebaseAuth
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'photoUrl': downloadUrl,
-        });
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'photoUrl': downloadUrl});
         await user.updatePhotoURL(downloadUrl);
-
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Cập nhật ảnh đại diện thành công!")),
-        );
-
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cập nhật ảnh đại diện thành công!")));
       } catch (e) {
-        // In lỗi chi tiết ra console để gỡ lỗi
-        print("Lỗi chi tiết khi tải ảnh lên: $e");
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Lỗi tải ảnh lên: $e")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Lỗi tải ảnh lên: $e")));
       } finally {
-        if(mounted) {
-          setState(() => _isUploading = false);
-        }
+        if(mounted) setState(() => _isUploading = false);
       }
     }
   }
 
-  // *** HÀM MỚI: Tự động tạo dữ liệu người dùng nếu thiếu ***
   Future<void> _createUserDataIfMissing(User user) async {
+    // ... logic giữ nguyên
     final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     final doc = await userRef.get();
-
-    // Chỉ tạo nếu document thực sự chưa tồn tại
     if (!doc.exists) {
-      print('User document not found for ${user.uid}. Creating one...');
       try {
         await userRef.set({
           'uid': user.uid,
@@ -95,18 +68,11 @@ class _ProfilePageState extends State<ProfilePage> {
           'displayName': user.displayName ?? 'Người dùng mới',
           'photoUrl': user.photoURL,
           'createdAt': FieldValue.serverTimestamp(),
-          'learningStats': {
-            'wordsLearned': 0,
-            'streakDays': 0,
-            'achievements': 0,
-          },
-          'settings': {
-            'pushNotificationsEnabled': true,
-          },
+          'learningStats': {'wordsLearned': 0, 'streakDays': 0, 'achievements': 0},
+          'settings': {'pushNotificationsEnabled': true},
         });
       } catch (e) {
         print("Error creating user document: $e");
-        // Có thể hiển thị lỗi cho người dùng ở đây nếu cần
       }
     }
   }
@@ -115,91 +81,78 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
-    // *** SỬA ĐỔI Ở ĐÂY ***
     final user = authService.getCurrentUser();
 
     if (user == null) {
-      // Trường hợp hiếm gặp, nhưng nên có để phòng lỗi
+      // Vẫn cần một trang chờ cơ bản
       return const Scaffold(body: Center(child: Text("Không tìm thấy người dùng.")));
     }
 
+    // ÁP DỤNG NỀN ĐỘNG CHO TOÀN BỘ TRANG
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      // Sử dụng StreamBuilder để lắng nghe dữ liệu người dùng real-time
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text("Lỗi: ${snapshot.error}"));
-          }
+        backgroundColor: Colors.transparent, // Nền trong suốt để thấy gradient
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+          builder: (context, snapshot) {
+            // Các trạng thái loading, error cần style lại để thấy trên nền tối
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: Colors.white));
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text("Lỗi: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
+            }
+            if (!snapshot.hasData || !snapshot.data!.exists) {
+              return FutureBuilder(
+                future: _createUserDataIfMissing(user),
+                builder: (context, futureSnapshot) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 16),
+                        Text("Đang khởi tạo dữ liệu...", style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  );
+                },
+              );
+            }
+            final userData = snapshot.data!.data()!;
+            final displayName = userData['displayName'] ?? 'Người dùng mới';
+            final email = userData['email'] ?? '';
+            final photoUrl = userData['photoUrl'] as String?;
+            final stats = userData['learningStats'] as Map<String, dynamic>? ?? {};
+            final wordsLearned = stats['wordsLearned'] ?? 0;
+            final streakDays = stats['streakDays'] ?? 0;
+            final achievements = stats['achievements'] ?? 0;
 
-          // *** LOGIC SỬA LỖI NẰM Ở ĐÂY ***
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            // Nếu không tìm thấy document, gọi hàm tạo dữ liệu
-            // và hiển thị màn hình loading trong lúc chờ.
-            return FutureBuilder(
-              future: _createUserDataIfMissing(user),
-              builder: (context, futureSnapshot) {
-                // Sau khi hàm tạo dữ liệu chạy xong, StreamBuilder sẽ tự động
-                // nhận dữ liệu mới và vẽ lại UI, nên chỉ cần hiển thị loading.
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text("Đang khởi tạo dữ liệu người dùng..."),
-                    ],
+            return SafeArea(
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _buildHeader(context, displayName, email, photoUrl),
                   ),
-                );
-              },
+                  SliverToBoxAdapter(
+                    child: _buildStatsCard(wordsLearned, streakDays, achievements),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _buildOptionsList(context, authService),
+                  ),
+                ],
+              ),
             );
-          }
-
-          // Lấy dữ liệu từ snapshot
-          final userData = snapshot.data!.data()!;
-          final displayName = userData['displayName'] ?? 'Người dùng mới';
-          final email = userData['email'] ?? '';
-          final photoUrl = userData['photoUrl'] as String?;
-
-          // Lấy dữ liệu học tập, với giá trị mặc định là 0
-          final stats = userData['learningStats'] as Map<String, dynamic>? ?? {};
-          final wordsLearned = stats['wordsLearned'] ?? 0;
-          final streakDays = stats['streakDays'] ?? 0;
-          final achievements = stats['achievements'] ?? 0;
-
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _buildHeader(context, displayName, email, photoUrl),
-              ),
-              SliverToBoxAdapter(
-                child: _buildStatsCard(wordsLearned, streakDays, achievements),
-              ),
-              SliverToBoxAdapter(
-                child: _buildOptionsList(context, authService),
-              ),
-            ],
-          );
-        },
-      ),
+          },
+        ),
     );
   }
 
-  // Widget xây dựng phần Header màu xanh
+  // ----- CÁC WIDGET GIAO DIỆN ĐƯỢC STYLE LẠI -----
+
   Widget _buildHeader(BuildContext context, String name, String email, String? photoUrl) {
-    return Container(
-      padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20, right: 20),
-      decoration: const BoxDecoration(
-        color: Colors.blue,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
-      ),
+    // Bỏ container cũ, đặt trực tiếp lên nền gradient
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       child: Column(
         children: [
           GestureDetector(
@@ -207,142 +160,112 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.white,
-                  // Sử dụng CachedNetworkImage để tải và cache ảnh, hiển thị placeholder
-                  backgroundImage: (photoUrl != null)
-                      ? CachedNetworkImageProvider(photoUrl)
-                      : null,
-                  child: (photoUrl == null && !_isUploading)
-                      ? const Icon(Icons.person, size: 50, color: Colors.blue)
-                      : null,
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 3),
+                  ),
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    backgroundImage: (photoUrl != null) ? CachedNetworkImageProvider(photoUrl) : null,
+                    child: (photoUrl == null && !_isUploading)
+                        ? const Icon(Icons.person, size: 50, color: Colors.white70)
+                        : null,
+                  ),
                 ),
-                if (_isUploading) const CircularProgressIndicator(),
+                if (_isUploading) const CircularProgressIndicator(color: Colors.white),
               ],
             ),
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 20),
           Text(
             name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: GoogleFonts.inter(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 5),
           Text(
             email,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 16,
-            ),
+            style: GoogleFonts.inter(color: Colors.white.withOpacity(0.8), fontSize: 16),
           ),
         ],
       ),
     );
   }
 
-  // Widget xây dựng phần thẻ thống kê
   Widget _buildStatsCard(int words, int streak, int achievements) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(Icons.school_outlined, words.toString(), "Từ đã học", Colors.blue),
-          _buildStatItem(Icons.local_fire_department_outlined, streak.toString(), "Ngày chuỗi", Colors.orange),
-          _buildStatItem(Icons.star_border_outlined, achievements.toString(), "Thành tích", Colors.amber),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: GlassmorphicContainer(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(Icons.school_outlined, words.toString(), "Từ đã học"),
+              _buildStatItem(Icons.local_fire_department_outlined, streak.toString(), "Ngày chuỗi"),
+              _buildStatItem(Icons.star_border_outlined, achievements.toString(), "Thành tích"),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // Widget cho mỗi mục thống kê
-  Widget _buildStatItem(IconData icon, String value, String label, Color color) {
+  Widget _buildStatItem(IconData icon, String value, String label) {
+    // Style lại với màu trắng
     return Column(
       children: [
-        Icon(icon, color: color, size: 30),
+        Icon(icon, color: Colors.white, size: 30),
         const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
+        Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(color: Colors.grey[600], fontSize: 14),
-        ),
+        Text(label, style: GoogleFonts.inter(color: Colors.white.withOpacity(0.7), fontSize: 14)),
       ],
     );
   }
 
-  // Widget xây dựng danh sách các tùy chọn
   Widget _buildOptionsList(BuildContext context, AuthService authService) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        children: [
-          _buildOptionItem(
-            context,
-            icon: Icons.person_outline,
-            title: "Chỉnh sửa hồ sơ",
-            onTap: () {
-              // TODO: Điều hướng đến trang EditProfilePage
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfilePage()));
-            },
-          ),
-          _buildOptionItem(
-            context,
-            icon: Icons.notifications_outlined,
-            title: "Quản lý thông báo",
-            onTap: () {},
-          ),
-          _buildOptionItem(
-            context,
-            icon: Icons.lock_outline,
-            title: "Đổi mật khẩu",
-            onTap: () {},
-          ),
-          _buildOptionItem(
-            context,
-            icon: Icons.logout,
-            title: "Đăng xuất",
-            color: Colors.red,
-            onTap: () async {
-              await authService.signOut();
-              // AuthWrapper sẽ tự động xử lý chuyển hướng
-            },
-          ),
-        ],
+    // Sử dụng GlassmorphicContainer
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child:
+      GlassmorphicContainer(
+        child: Column(
+          children: [
+            _buildOptionItem(context, icon: Icons.person_outline, title: "Chỉnh sửa hồ sơ", onTap: () {}),
+            Divider(color: Colors.white.withOpacity(0.15), height: 1),
+            _buildOptionItem(context, icon: Icons.notifications_outlined, title: "Quản lý thông báo", onTap: () {}),
+            Divider(color: Colors.white.withOpacity(0.15), height: 1),
+            _buildOptionItem(context, icon: Icons.lock_outline, title: "Đổi mật khẩu", onTap: () {}),
+            Divider(color: Colors.white.withOpacity(0.15), height: 1),
+            _buildOptionItem(
+              context,
+              icon: Icons.logout,
+              title: "Đăng xuất",
+              color: const Color(0xFFFF7B7B), // Màu đỏ tươi hơn
+              onTap: () async {
+                await authService.signOut();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Widget cho mỗi mục tùy chọn
   Widget _buildOptionItem(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap, Color? color}) {
+    // Style lại ListTile
+    final itemColor = color ?? Colors.white;
     return ListTile(
-      leading: Icon(icon, color: color ?? Colors.grey[700]),
-      title: Text(title, style: TextStyle(color: color ?? Colors.black87)),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      leading: Icon(icon, color: itemColor),
+      title: Text(title, style: GoogleFonts.inter(color: itemColor)),
+      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white.withOpacity(0.7)),
+      onTap: (onTap),
+      splashColor: Colors.black.withOpacity(0.1),
     );
   }
 }

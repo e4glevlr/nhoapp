@@ -12,8 +12,8 @@ class AuthService {
   Future<User?> signUp(String email, String password, String displayName) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
+        email: email.trim(),
+        password: password.trim(),
       );
       User? user = result.user;
 
