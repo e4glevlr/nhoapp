@@ -9,6 +9,7 @@ import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'schedule_page.dart';
 import 'voice_page.dart';
+import 'helpers/navigation_helper.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -41,16 +42,15 @@ class NoScrollbarBehavior extends ScrollBehavior {
   }
 }
 
+
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
 }
 
-// CHANGE 1: Move animation logic to the parent widget state
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
 
-  // Animation controller and animations are now managed here
   late AnimationController _controller;
   late Animation<Alignment> _topAlignmentAnimation;
   late Animation<Alignment> _bottomAlignmentAnimation;
@@ -63,6 +63,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   ];
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == index) return;
     setState(() {
       _selectedIndex = index;
     });
@@ -72,20 +73,37 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _controller =
-        AnimationController(vsync: this, duration: const Duration(seconds: 10));
+    AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+
     _topAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft),
+          weight: 1),
     ]).animate(_controller);
+
     _bottomAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem<Alignment>(tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight),
+          weight: 1),
+      TweenSequenceItem<Alignment>(
+          tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight),
+          weight: 1),
     ]).animate(_controller);
-    _controller.repeat();
   }
 
   @override
@@ -96,46 +114,60 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    // CHANGE 2: Wrap the entire Scaffold body with the AnimatedBuilder
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: const [Color(0xFF6a11cb), Color(0xFF2575fc)],
-              begin: _topAlignmentAnimation.value,
-              end: _bottomAlignmentAnimation.value,
+    return Stack(
+      children: [
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: const [Color(0xFF6a11cb), Color(0xFF2575fc)],
+                  begin: _topAlignmentAnimation.value,
+                  end: _bottomAlignmentAnimation.value,
+                ),
+              ),
+            );
+          },
+        ),
+
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+            child: Container(
+              key: ValueKey<int>(_selectedIndex),
+              child: _pages[_selectedIndex],
             ),
           ),
-          child: child, // The child is the Scaffold below
-        );
-      },
-      child: Scaffold(
-        backgroundColor: Colors.transparent, // Make scaffold transparent
-        body: _pages[_selectedIndex], // The current page is displayed here
-        bottomNavigationBar: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Hồ sơ'),
-            BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Thông báo'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Cài đặt'),
-          ],
-          currentIndex: _selectedIndex,
-          // Make navbar glass-like to see the animation behind it
-          backgroundColor: Colors.white.withOpacity(0.1),
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white.withOpacity(0.6),
-          elevation: 0,
-          onTap: _onItemTapped,
+          bottomNavigationBar: BottomNavigationBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
+              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Hồ sơ'),
+              BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Thông báo'),
+              BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Cài đặt'),
+            ],
+            currentIndex: _selectedIndex,
+            backgroundColor: Colors.white.withOpacity(0.1),
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.white.withOpacity(0.6),
+            elevation: 0,
+            onTap: _onItemTapped,
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-// CHANGE 3: Remove animation logic from HomePageContent
+
 class HomePageContent extends StatelessWidget {
   const HomePageContent({Key? key}) : super(key: key);
 
@@ -155,7 +187,7 @@ class HomePageContent extends StatelessWidget {
                   const SizedBox(height: 20),
                   PrimaryCtaButton(
                     text: "Bắt đầu Chat",
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatPage())),
+                    onPressed: () => navigateToPageWithFade(context, const ChatPage()),
                   ),
                 ],
               ),
@@ -188,7 +220,7 @@ class HomePageContent extends StatelessWidget {
                   const SizedBox(height: 20),
                   PrimaryCtaButton(
                     text: "Bắt đầu trò chuyện",
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VoiceChatPage())),
+                    onPressed: () => navigateToPageWithFade(context, const VoiceChatPage()),
                   ),
                 ],
               ),
@@ -204,37 +236,32 @@ class HomePageContent extends StatelessWidget {
   Widget _buildFeatureRow(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _buildFeatureCard(context, title: "Kiểm tra", icon: Icons.school_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TestPage())))),
+        Expanded(child: _buildFeatureCard(context, title: "Kiểm tra", icon: Icons.school_outlined, onTap: () => navigateToPageWithFade(context, const TestPage()))),
         const SizedBox(width: 12),
-        Expanded(child: _buildFeatureCard(context, title: "Lịch học", icon: Icons.calendar_month_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SchedulePage())))),
+        Expanded(child: _buildFeatureCard(context, title: "Lịch học", icon: Icons.calendar_month_outlined, onTap: () => navigateToPageWithFade(context, const SchedulePage()))),
         const SizedBox(width: 12),
-        Expanded(child: _buildFeatureCard(context, title: "Dữ liệu", icon: Icons.folder_copy_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => DocumentManagerPage())))),
+        Expanded(child: _buildFeatureCard(context, title: "Dữ liệu", icon: Icons.folder_copy_outlined, onTap: () => navigateToPageWithFade(context, const DocumentManagerPage()))),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // The AnimatedBuilder is no longer here.
-    // The Scaffold is now transparent to show the parent's background.
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Center(
-          child: ScrollConfiguration(
-            behavior: NoScrollbarBehavior(),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                    child: constraints.maxWidth > 768
-                        ? _buildWideLayout(context)
-                        : _buildNarrowLayout(context),
-                  ),
-                );
-              },
-            ),
+    return SafeArea(
+      child: Center(
+        child: ScrollConfiguration(
+          behavior: NoScrollbarBehavior(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                  child: constraints.maxWidth > 768
+                      ? _buildWideLayout(context)
+                      : _buildNarrowLayout(context),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -297,8 +324,6 @@ class HomePageContent extends StatelessWidget {
     );
   }
 }
-
-// --- Custom Widgets (Unchanged) ---
 
 class GlassmorphicContainer extends StatelessWidget {
   final Widget child;

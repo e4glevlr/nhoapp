@@ -1,21 +1,23 @@
+// lib/widgets/schedule_item_dialog.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:intl/intl.dart';
 import '../models/schedule_item.dart';
 import '../services/schedule_service.dart';
+import 'glassmorphic_container.dart';
 
 class ScheduleItemDialog extends StatefulWidget {
   final String userId;
-  final ScheduleItem? scheduleItem; // null nếu là thêm mới
-  final int? initialDay; // Ngày được chọn khi nhấn ô trống
-  final String? initialTime; // Giờ được chọn khi nhấn ô trống
+  final ScheduleItem? scheduleItem;
+  // Dùng để khởi tạo ngày mặc định khi thêm mới sự kiện một lần
+  final DateTime? initialDate;
 
   const ScheduleItemDialog({
     super.key,
     required this.userId,
     this.scheduleItem,
-    this.initialDay,
-    this.initialTime,
+    this.initialDate,
   });
 
   @override
@@ -26,25 +28,45 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _title, _location, _startTime, _endTime, _colorHex;
   String? _subjectCode, _lecturer, _notes;
-  late int _dayOfWeek;
-  bool _isSaving = false;
 
+  // --- State mới cho lịch thông minh ---
+  bool _isRecurring = false;
+  int _dayOfWeek = 2; // Mặc định là Thứ Hai
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now().add(const Duration(days: 90));
+  DateTime _specificDate = DateTime.now();
+
+  bool _isSaving = false;
   final ScheduleService _scheduleService = ScheduleService();
 
   @override
   void initState() {
     super.initState();
     final item = widget.scheduleItem;
+
     _title = item?.title ?? '';
     _location = item?.location ?? '';
     _subjectCode = item?.subjectCode;
     _lecturer = item?.lecturer;
     _notes = item?.notes;
-    _dayOfWeek = item?.dayOfWeek ?? widget.initialDay ?? 2;
-    _startTime = item?.startTime ?? widget.initialTime ?? '07:00';
-    // Mặc định endTime sau startTime 2 tiếng
+    _startTime = item?.startTime ?? '07:00';
     _endTime = item?.endTime ?? _calculateDefaultEndTime(_startTime);
     _colorHex = item?.colorHex ?? '#FF5733';
+
+    // Khởi tạo các giá trị ngày tháng từ `scheduleItem` nếu đang sửa
+    _isRecurring = item?.isRecurring ?? false;
+    if (item != null) {
+      if (_isRecurring) {
+        _dayOfWeek = item.dayOfWeek ?? 2;
+        _startDate = item.startDate ?? DateTime.now();
+        _endDate = item.endDate ?? DateTime.now().add(const Duration(days: 90));
+      } else {
+        _specificDate = item.specificDate ?? widget.initialDate ?? DateTime.now();
+      }
+    } else {
+      // Nếu thêm mới, sử dụng initialDate
+      _specificDate = widget.initialDate ?? DateTime.now();
+    }
   }
 
   String _calculateDefaultEndTime(String startTime) {
@@ -79,24 +101,24 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
   }
 
   void _showColorPicker() {
+    Color pickerColor = Color(int.parse(_colorHex.substring(1, 7), radix: 16) + 0xFF000000);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Chọn một màu'),
         content: SingleChildScrollView(
           child: ColorPicker(
-            pickerColor: Color(int.parse(_colorHex.substring(1, 7), radix: 16) + 0xFF000000),
-            onColorChanged: (color) {
-              setState(() {
-                _colorHex = '#${color.value.toRadixString(16).substring(2)}';
-              });
-            },
+            pickerColor: pickerColor,
+            onColorChanged: (color) => pickerColor = color,
           ),
         ),
         actions: <Widget>[
           ElevatedButton(
             child: const Text('Chọn'),
             onPressed: () {
+              setState(() {
+                _colorHex = '#${pickerColor.value.toRadixString(16).substring(2)}';
+              });
               Navigator.of(context).pop();
             },
           ),
@@ -105,30 +127,90 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
     );
   }
 
+  Future<void> _deleteItem() async {
+    if (widget.scheduleItem == null) return;
+
+    final bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Xác nhận xóa'),
+          content: const Text('Bạn có chắc chắn muốn xóa lịch học này không?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Hủy'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+            ),
+            TextButton(
+              child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmDelete == true) {
+      setState(() => _isSaving = true);
+      try {
+        await _scheduleService.deleteScheduleItem(widget.userId, widget.scheduleItem!.id);
+        if (mounted) Navigator.of(context).pop();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Xóa thất bại: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  // Hàm chọn ngày cho các trường mới
+  Future<void> _selectDate(BuildContext context, {required Function(DateTime) onDateSelected, required DateTime initialDate}) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      onDateSelected(picked);
+    }
+  }
+
   Future<void> _saveForm() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       setState(() => _isSaving = true);
 
       final newItem = ScheduleItem(
-        id: widget.scheduleItem?.id ?? '', // id sẽ được bỏ qua khi thêm mới
+        id: widget.scheduleItem?.id ?? '',
         title: _title,
         location: _location,
-        dayOfWeek: _dayOfWeek,
         startTime: _startTime,
         endTime: _endTime,
         colorHex: _colorHex,
         subjectCode: _subjectCode,
         lecturer: _lecturer,
         notes: _notes,
+        // Lưu dữ liệu mới dựa trên lựa chọn
+        isRecurring: _isRecurring,
+        dayOfWeek: _isRecurring ? _dayOfWeek : null,
+        startDate: _isRecurring ? _startDate : null,
+        endDate: _isRecurring ? _endDate : null,
+        specificDate: !_isRecurring ? _specificDate : null,
       );
 
       try {
         if (widget.scheduleItem == null) {
-          // Thêm mới
           await _scheduleService.addScheduleItem(widget.userId, newItem);
         } else {
-          // Cập nhật
           await _scheduleService.updateScheduleItem(widget.userId, newItem);
         }
         if (mounted) Navigator.of(context).pop();
@@ -144,126 +226,232 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
     }
   }
 
-  Future<void> _deleteItem() async {
-    if (widget.scheduleItem != null) {
-      setState(() => _isSaving = true);
-      try {
-        await _scheduleService.deleteScheduleItem(widget.userId, widget.scheduleItem!.id);
-        if (mounted) Navigator.of(context).pop(); // Đóng dialog hiện tại
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Xóa thất bại: $e')),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isSaving = false);
-      }
-    }
-  }
-
-
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.scheduleItem == null ? 'Thêm Lịch Học' : 'Sửa Lịch Học'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+    final textStyle = const TextStyle(color: Colors.white);
+    final inputDecorationTheme = const InputDecoration(
+      labelStyle: TextStyle(color: Colors.white70),
+      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+      errorStyle: TextStyle(color: Color.fromARGB(255, 255, 129, 129)),
+    );
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: GlassmorphicContainer(
+        borderRadius: 16,
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                initialValue: _title,
-                decoration: const InputDecoration(labelText: 'Tên môn học/Sự kiện'),
-                validator: (value) => value!.isEmpty ? 'Vui lòng nhập tên' : null,
-                onSaved: (value) => _title = value!,
-              ),
-              TextFormField(
-                initialValue: _location,
-                decoration: const InputDecoration(labelText: 'Địa điểm (Phòng học)'),
-                validator: (value) => value!.isEmpty ? 'Vui lòng nhập địa điểm' : null,
-                onSaved: (value) => _location = value!,
-              ),
-              DropdownButtonFormField<int>(
-                value: _dayOfWeek,
-                decoration: const InputDecoration(labelText: 'Ngày trong tuần'),
-                items: const [
-                  DropdownMenuItem(value: 2, child: Text('Thứ Hai')),
-                  DropdownMenuItem(value: 3, child: Text('Thứ Ba')),
-                  DropdownMenuItem(value: 4, child: Text('Thứ Tư')),
-                  DropdownMenuItem(value: 5, child: Text('Thứ Năm')),
-                  DropdownMenuItem(value: 6, child: Text('Thứ Sáu')),
-                  DropdownMenuItem(value: 7, child: Text('Thứ Bảy')),
-                  DropdownMenuItem(value: 1, child: Text('Chủ Nhật')),
-                ],
-                onChanged: (value) => setState(() => _dayOfWeek = value!),
-              ),
-              Row(
-                children: [
-                  Expanded(child: Text('Bắt đầu: $_startTime')),
-                  IconButton(
-                    icon: const Icon(Icons.edit_calendar_outlined),
-                    onPressed: () => _selectTime(context, true),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: Text('Kết thúc: $_endTime')),
-                  IconButton(
-                    icon: const Icon(Icons.edit_calendar_outlined),
-                    onPressed: () => _selectTime(context, false),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Text('Màu sắc: '),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _showColorPicker,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Color(int.parse(_colorHex.substring(1, 7), radix: 16) + 0xFF000000),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey),
+              Text(widget.scheduleItem == null ? 'Thêm Lịch' : 'Sửa Lịch', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        initialValue: _title,
+                        style: textStyle,
+                        decoration: inputDecorationTheme.copyWith(labelText: 'Tên môn học/Sự kiện'),
+                        validator: (value) => value!.isEmpty ? 'Vui lòng nhập tên' : null,
+                        onSaved: (value) => _title = value!,
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: _location,
+                        style: textStyle,
+                        decoration: inputDecorationTheme.copyWith(labelText: 'Địa điểm (Phòng học)'),
+                        validator: (value) => value!.isEmpty ? 'Vui lòng nhập địa điểm' : null,
+                        onSaved: (value) => _location = value!,
+                      ),
+
+                      const SizedBox(height: 16),
+                      _buildEventTypeSwitch(),
+                      const SizedBox(height: 16),
+
+                      // Hiển thị các ô nhập liệu động
+                      if (_isRecurring) ..._buildRecurringFields(textStyle, inputDecorationTheme)
+                      else ..._buildOneTimeFields(),
+
+                      const SizedBox(height: 16),
+                      _buildTimeRow('Bắt đầu:', _startTime, () => _selectTime(context, true)),
+                      _buildTimeRow('Kết thúc:', _endTime, () => _selectTime(context, false)),
+                      const SizedBox(height: 12),
+                      _buildColorPickerRow(),
+                      const SizedBox(height: 10),
+
+                      TextFormField(
+                        initialValue: _lecturer,
+                        style: textStyle,
+                        decoration: inputDecorationTheme.copyWith(labelText: 'Giảng viên (Tùy chọn)'),
+                        onSaved: (value) => _lecturer = value,
+                      ),
+                      TextFormField(
+                        initialValue: _notes,
+                        style: textStyle,
+                        decoration: inputDecorationTheme.copyWith(labelText: 'Ghi chú (Tùy chọn)'),
+                        onSaved: (value) => _notes = value,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 10),
-              TextFormField(
-                initialValue: _lecturer,
-                decoration: const InputDecoration(labelText: 'Giảng viên (Tùy chọn)'),
-                onSaved: (value) => _lecturer = value,
-              ),
-              TextFormField(
-                initialValue: _notes,
-                decoration: const InputDecoration(labelText: 'Ghi chú (Tùy chọn)'),
-                onSaved: (value) => _notes = value,
-              ),
+              const SizedBox(height: 20),
+              _buildActionsRow(),
             ],
           ),
         ),
       ),
-      actions: [
+    );
+  }
+
+  //--- CÁC WIDGET HELPER MỚI CHO GIAO DIỆN ĐỘNG ---
+
+  Widget _buildEventTypeSwitch() {
+    return GlassmorphicContainer(
+      borderRadius: 30,
+      padding: const EdgeInsets.all(4),
+      opacity: 0.2,
+      child: Row(
+        children: [
+          Expanded(child: _buildSwitchOption('Một lần', !_isRecurring)),
+          Expanded(child: _buildSwitchOption('Lặp lại', _isRecurring)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchOption(String title, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isRecurring = title == 'Lặp lại';
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(title, textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      ),
+    );
+  }
+
+  List<Widget> _buildRecurringFields(TextStyle textStyle, InputDecoration decoration) {
+    return [
+      DropdownButtonFormField<int>(
+        value: _dayOfWeek,
+        decoration: decoration.copyWith(labelText: 'Ngày trong tuần'),
+        dropdownColor: Colors.blueGrey[700],
+        icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+        items: [
+          DropdownMenuItem(value: 2, child: Text('Thứ Hai', style: textStyle)),
+          DropdownMenuItem(value: 3, child: Text('Thứ Ba', style: textStyle)),
+          DropdownMenuItem(value: 4, child: Text('Thứ Tư', style: textStyle)),
+          DropdownMenuItem(value: 5, child: Text('Thứ Năm', style: textStyle)),
+          DropdownMenuItem(value: 6, child: Text('Thứ Sáu', style: textStyle)),
+          DropdownMenuItem(value: 7, child: Text('Thứ Bảy', style: textStyle)),
+          DropdownMenuItem(value: 1, child: Text('Chủ Nhật', style: textStyle)),
+        ],
+        onChanged: (value) => setState(() => _dayOfWeek = value!),
+      ),
+      const SizedBox(height: 16),
+      _buildDateRow("Từ ngày:", _startDate, (date) => setState(() => _startDate = date)),
+      _buildDateRow("Đến ngày:", _endDate, (date) => setState(() => _endDate = date)),
+    ];
+  }
+
+  List<Widget> _buildOneTimeFields() {
+    return [_buildDateRow("Ngày diễn ra:", _specificDate, (date) => setState(() => _specificDate = date))];
+  }
+
+  Widget _buildDateRow(String label, DateTime date, Function(DateTime) onDateSelected) {
+    return Row(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+        const SizedBox(width: 8),
+        Text(
+          DateFormat('dd/MM/yyyy').format(date),
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.edit_calendar_outlined, color: Colors.white70),
+          onPressed: () => _selectDate(context, onDateSelected: onDateSelected, initialDate: date),
+        ),
+      ],
+    );
+  }
+
+  //--- CÁC WIDGET HELPER CŨ ---
+
+  Widget _buildTimeRow(String label, String time, VoidCallback onPressed) {
+    return Row(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+        const SizedBox(width: 8),
+        Text(time, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.edit_calendar_outlined, color: Colors.white70),
+          onPressed: onPressed,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorPickerRow() {
+    return Row(
+      children: [
+        const Text('Màu sắc:', style: TextStyle(color: Colors.white70, fontSize: 16)),
+        const Spacer(),
+        GestureDetector(
+          onTap: _showColorPicker,
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Color(int.parse(_colorHex.substring(1, 7), radix: 16) + 0xFF000000),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white54),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionsRow() {
+    return Row(
+      children: [
         if (widget.scheduleItem != null)
           IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
+            icon: const Icon(Icons.delete, color: Colors.redAccent),
             onPressed: _isSaving ? null : _deleteItem,
+            tooltip: "Xóa",
           ),
         const Spacer(),
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Hủy'),
+          child: const Text('Hủy', style: TextStyle(color: Colors.white70)),
         ),
+        const SizedBox(width: 8),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white.withOpacity(0.2),
+            foregroundColor: Colors.white,
+          ),
           onPressed: _isSaving ? null : _saveForm,
-          child: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Lưu'),
+          child: _isSaving
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Lưu'),
         ),
       ],
     );

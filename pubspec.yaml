@@ -30,7 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  flutter_neat_and_clean_calendar:
+    git:
+      url: https://github.com/rwbr/flutter_neat_and_clean_calendar.git
+      ref: c392343749fec90070939d6b050e7622a75d89d3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

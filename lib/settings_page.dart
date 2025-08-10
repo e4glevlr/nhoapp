@@ -32,17 +32,30 @@ class _SettingsPageState extends State<SettingsPage> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final currentUser = authService.getCurrentUser();
 
-    return Scaffold(
-      backgroundColor: Colors.transparent, // Keeps background see-through
-      appBar: AppBar(
-        title: Text("Cài đặt", style: GoogleFonts.inter(color: Colors.white)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
+    // Widget gốc là SafeArea để tránh các phần tử giao diện bị che khuất
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header tùy chỉnh thay thế cho AppBar
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Text(
+                "Cài đặt",
+                style: GoogleFonts.inter(
+                    fontSize: 22,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600
+                )
+            ),
+          ),
+          // Phần thân của trang cài đặt
+          Expanded(
+            child: currentUser == null
+                ? _buildLoginPrompt()
+                : _buildSettingsBody(currentUser),
+          ),
+        ],
       ),
-      body: currentUser == null
-          ? _buildLoginPrompt()
-          : _buildSettingsBody(currentUser),
     );
   }
 
@@ -70,8 +83,8 @@ class _SettingsPageState extends State<SettingsPage> {
           return Center(child: Text('Đã xảy ra lỗi: ${snapshot.error}', style: TextStyle(color: Colors.white70)));
         }
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          // Create default settings if user doc exists but settings are missing
-          return _buildSettingsContent(currentUser, true); // Default to true
+          // Xử lý trường hợp không có dữ liệu
+          return _buildSettingsContent(currentUser, true); // Mặc định là bật
         }
 
         final userData = snapshot.data!.data() as Map<String, dynamic>;

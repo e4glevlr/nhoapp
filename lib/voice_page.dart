@@ -1,4 +1,5 @@
-// voice_chat_page.dart
+// lib/voice_chat_page.dart
+
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -11,7 +12,6 @@ import 'package:http_parser/http_parser.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-/// Full VoiceChatPage with Siri-like glowing border + glassmorphism
 class VoiceChatPage extends StatefulWidget {
   const VoiceChatPage({super.key});
 
@@ -21,22 +21,18 @@ class VoiceChatPage extends StatefulWidget {
 
 class _VoiceChatPageState extends State<VoiceChatPage>
     with TickerProviderStateMixin {
-  // --- Core logic objects (unchanged) ---
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _tts = FlutterTts();
   bool _isListening = false;
   String _currentText = '';
-  List<_Message> _messages = [];
+  final List<_Message> _messages = [];
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
 
-  // Example IDs (replace as needed)
   final String userId = "user123";
   final String sessionId = "session123";
 
-  // --- UI animations ---
-  late final AnimationController _siriController; // for full-screen border
-  late final AnimationController _bubbleController; // optional small bubbles
+  late final AnimationController _siriController;
 
   @override
   void initState() {
@@ -44,15 +40,9 @@ class _VoiceChatPageState extends State<VoiceChatPage>
     _tts.setLanguage("vi-VN");
     _tts.setSpeechRate(0.9);
 
-    // animation controllers
     _siriController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 6),
-    )..repeat();
-
-    _bubbleController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
     )..repeat();
 
     _requestCameraPermission();
@@ -64,7 +54,6 @@ class _VoiceChatPageState extends State<VoiceChatPage>
     _tts.stop();
     _cameraController?.dispose();
     _siriController.dispose();
-    _bubbleController.dispose();
     super.dispose();
   }
 
@@ -72,48 +61,36 @@ class _VoiceChatPageState extends State<VoiceChatPage>
     final status = await Permission.camera.request();
     if (status.isGranted) {
       await _initializeCamera();
-    } else {
-      // permission denied: handle if needed
     }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _initializeCamera({bool useFrontCamera = true}) async {
     try {
       _cameras = await availableCameras();
-      final frontCamera = _cameras.firstWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.front,
+      if (_cameras.isEmpty) return;
+
+      final selectedCamera = _cameras.firstWhere(
+            (camera) => useFrontCamera
+            ? camera.lensDirection == CameraLensDirection.front
+            : camera.lensDirection == CameraLensDirection.back,
         orElse: () => _cameras.first,
       );
-      _cameraController = CameraController(frontCamera, ResolutionPreset.medium);
+
+      // Dispose the old controller before creating a new one
+      await _cameraController?.dispose();
+
+      _cameraController = CameraController(selectedCamera, ResolutionPreset.high, enableAudio: false);
       await _cameraController!.initialize();
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
-      // ignore camera errors for now or show message
+      debugPrint("Camera initialization error: $e");
     }
   }
 
   Future<void> _toggleCamera() async {
-    if (_cameras.isEmpty) _cameras = await availableCameras();
     if (_cameraController == null) return;
     final currentLens = _cameraController!.description.lensDirection;
-    CameraDescription newCamera;
-    if (currentLens == CameraLensDirection.front) {
-      newCamera = _cameras.firstWhere(
-            (cam) => cam.lensDirection == CameraLensDirection.back,
-        orElse: () => _cameraController!.description,
-      );
-    } else {
-      newCamera = _cameras.firstWhere(
-            (cam) => cam.lensDirection == CameraLensDirection.front,
-        orElse: () => _cameraController!.description,
-      );
-    }
-    if (newCamera != _cameraController!.description) {
-      await _cameraController!.dispose();
-      _cameraController = CameraController(newCamera, ResolutionPreset.medium);
-      await _cameraController!.initialize();
-      setState(() {});
-    }
+    await _initializeCamera(useFrontCamera: currentLens == CameraLensDirection.back);
   }
 
   Future<void> _startListening() async {
@@ -194,24 +171,17 @@ class _VoiceChatPageState extends State<VoiceChatPage>
     });
   }
 
-  // --- UI building helpers (glassmorphism) ---
-  Widget _glassPanel({required Widget child, double radius = 20.0}) {
+  Widget _glassPanel({required Widget child, double radius = 20.0, EdgeInsets? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
+          padding: padding,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.06),
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.25),
-                blurRadius: 10,
-                offset: const Offset(0, 6),
-              )
-            ],
           ),
           child: child,
         ),
@@ -221,84 +191,66 @@ class _VoiceChatPageState extends State<VoiceChatPage>
 
   Widget _buildMessage(_Message msg) {
     final alignment = msg.isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final bg = msg.isUser ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.06);
-    final border = msg.isUser ? Colors.white.withOpacity(0.18) : Colors.white.withOpacity(0.08);
+    final bg = msg.isUser ? Colors.blue.withOpacity(0.3) : Colors.white.withOpacity(0.1);
     final radius = msg.isUser
         ? const BorderRadius.only(
-      topLeft: Radius.circular(18),
-      topRight: Radius.circular(18),
-      bottomLeft: Radius.circular(18),
-    )
+        topLeft: Radius.circular(18), topRight: Radius.circular(18), bottomLeft: Radius.circular(18))
         : const BorderRadius.only(
-      topLeft: Radius.circular(18),
-      topRight: Radius.circular(18),
-      bottomRight: Radius.circular(18),
-    );
+        topLeft: Radius.circular(18), topRight: Radius.circular(18), bottomRight: Radius.circular(18));
 
     return Align(
       alignment: alignment,
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: radius,
-              border: Border.all(color: border, width: 1),
-            ),
-            child: Text(
-              msg.text,
-              style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.3),
-            ),
-          ),
-        ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        constraints:
+        BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        decoration: BoxDecoration(color: bg, borderRadius: radius),
+        child: Text(msg.text, style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.3)),
       ),
     );
   }
 
-  Widget _buildMicButton() {
-    final micBtn = SizedBox(
-      width: double.infinity,
-      height: 64,
-      child: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _isListening ? Icons.stop_circle : Icons.mic,
-              color: Colors.white,
-              size: 30,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _isListening ? "" : "",
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          SizedBox(
+            width: 64,
+            height: 64,
+            child: _glassPanel(
+              radius: 32,
+              child: IconButton(
+                onPressed: _toggleCamera,
+                icon: const Icon(Icons.flip_camera_ios_outlined, color: Colors.white70),
+                tooltip: 'Xoay camera',
               ),
             ),
-          ],
-        ),
-      ),
-    );
-
-    // Wrap mic button in glass + siri ring (active when listening)
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SiriRing(
-        active: _isListening,
-        controller: _siriController,
-        child: _glassPanel(child: InkWell(
-          borderRadius: BorderRadius.circular(40),
-          onTap: _isListening ? _stopListening : _startListening,
-          child: micBtn,
-        ), radius: 40),
+          ),
+          GestureDetector(
+            onTap: _isListening ? _stopListening : _startListening,
+            child: SiriRing(
+              active: _isListening,
+              controller: _siriController,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF2575fc), Color(0xFF6a11cb)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Icon(_isListening ? Icons.stop : Icons.mic_none, color: Colors.white, size: 40),
+              ),
+            ),
+          ),
+          const SizedBox(width: 64, height: 64),
+        ],
       ),
     );
   }
@@ -306,30 +258,33 @@ class _VoiceChatPageState extends State<VoiceChatPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // transparent scaffold so full-screen painter shows
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // --- camera preview or gradient background ---
+          // LỚP 1: NỀN (CAMERA HOẶC GRADIENT)
           if (_cameraController != null && _cameraController!.value.isInitialized)
-            SizedBox.expand(child: CameraPreview(_cameraController!))
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _cameraController!.value.previewSize!.height,
+                  height: _cameraController!.value.previewSize!.width,
+                  child: CameraPreview(_cameraController!),
+                ),
+              ),
+            )
           else
-          // fallback gradient water-like background with subtle bubbles
             Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: const [
-                    Color(0xFF071030),
-                    Color(0xFF09223F),
-                    Color(0xFF073B4C),
-                  ],
+                  colors: [Color(0xFF071030), Color(0xFF09223F), Color(0xFF073B4C)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
             ),
 
-          // --- siri glass border painter on top of content ---
+          // LỚP 2: GIAO DIỆN CHAT VÀ ĐIỀU KHIỂN
           AnimatedBuilder(
             animation: _siriController,
             builder: (context, child) {
@@ -341,71 +296,33 @@ class _VoiceChatPageState extends State<VoiceChatPage>
             child: SafeArea(
               child: Column(
                 children: [
-                  const SizedBox(height: 12),
-                  // AppBar area (glass)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _glassPanel(
-                      radius: 14,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 18,
-                              child: Icon(Icons.mic, color: Colors.white),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Text("🎙️ Voice Chat Bot",
-                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  SizedBox(height: 2),
-                                  Text("Nói để chat — Tự động gửi kèm ảnh nếu bật camera",
-                                      style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: _toggleCamera,
-                              icon: const Icon(Icons.switch_camera, color: Colors.white),
-                            )
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // --- chat area (glass panel) ---
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: _glassPanel(
-                        radius: 20,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              itemCount: _messages.length,
-                              itemBuilder: (context, index) => _buildMessage(_messages[index]),
-                            ),
-                          ),
-                        ),
-                      ),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(top: 70, bottom: 16),
+                      reverse: true,
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final reversedIndex = _messages.length - 1 - index;
+                        return _buildMessage(_messages[reversedIndex]);
+                      },
                     ),
                   ),
-
-                  // --- mic status (text) ---
-
-
-                  // --- mic button (glass + siri ring) ---
-                  _buildMicButton(),
+                  _buildControls(),
                 ],
+              ),
+            ),
+          ),
+
+          // LỚP 3: NÚT QUAY LẠI (LUÔN Ở TRÊN CÙNG)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            child: _glassPanel(
+              radius: 25,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Quay lại',
               ),
             ),
           ),
@@ -415,7 +332,6 @@ class _VoiceChatPageState extends State<VoiceChatPage>
   }
 }
 
-/// Siri-style ring widget: paints a moving sweep gradient ring around child
 class SiriRing extends StatelessWidget {
   final Widget child;
   final bool active;
@@ -477,7 +393,6 @@ class _RingPainter extends CustomPainter {
   }
 }
 
-/// Painter for full-screen Siri-like border (subtle)
 class _SiriBorderPainter extends CustomPainter {
   final double angle;
   _SiriBorderPainter({required this.angle});
@@ -487,7 +402,6 @@ class _SiriBorderPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final double thickness = math.max(3, size.shortestSide * 0.006);
 
-    // outer glow (soft)
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -498,7 +412,6 @@ class _SiriBorderPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawRect(rect, glowPaint);
 
-    // sweep gradient border
     final sweep = SweepGradient(
       startAngle: 0,
       endAngle: math.pi * 2,
