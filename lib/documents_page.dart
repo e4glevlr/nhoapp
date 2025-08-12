@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'widgets/glassmorphic_container.dart';
-// import 'widgets/primary_cta_button.dart'; // Widget này không còn được sử dụng
+import 'components/GlassmorphicToggle.dart' as gm;
 
 class Document {
   final String name;
@@ -149,10 +147,8 @@ class _DocumentManagerPageState extends State<DocumentManagerPage> with SingleTi
       // Nền trong suốt để thấy gradient
       backgroundColor: Colors.transparent,
       // Nút FAB mới với hiệu ứng glassmorphism
-      floatingActionButton: GlassmorphicContainer(
+      floatingActionButton: gm.GlassmorphicContainer(
         borderRadius: 50,
-        blur: 10,
-        opacity: 0.2,
         child: SizedBox(
           width: 60,
           height: 60,
@@ -180,41 +176,63 @@ class _DocumentManagerPageState extends State<DocumentManagerPage> with SingleTi
         },
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header với nút quay lại
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                      tooltip: 'Quay lại',
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Tài liệu',
-                          style: GoogleFonts.inter(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                // Header ẩn + nút back kính mờ
+                SizedBox(
+                  height: kToolbarHeight,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 0),
+                          child: gm.GlassmorphicContainer(
+                            borderOpacity: 0.12,
+                            borderWidth: 1,
+                            isPerformanceMode: true,
+                            child: SizedBox.square(
+                              dimension: 44,
+                              child: IconButton(
+                                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                                onPressed: () => Navigator.of(context).pop(),
+                                tooltip: 'Quay lại',
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Quản lý các tệp tin của bạn',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.7),
-                          ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Tiêu đề trang
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 4.0, right: 4.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Tài liệu',
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Quản lý các tệp tin của bạn',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 24),
@@ -272,7 +290,8 @@ class _DocumentManagerPageState extends State<DocumentManagerPage> with SingleTi
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
-        return GlassmorphicContainer(
+        return gm.GlassmorphicContainer(
+
           borderRadius: 16,
           child: InkWell(
             onTap: () => _openDocument(index),

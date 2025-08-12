@@ -5,12 +5,10 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:intl/intl.dart';
 import '../models/schedule_item.dart';
 import '../services/schedule_service.dart';
-import 'glassmorphic_container.dart';
 
 class ScheduleItemDialog extends StatefulWidget {
   final String userId;
   final ScheduleItem? scheduleItem;
-  // Dùng để khởi tạo ngày mặc định khi thêm mới sự kiện một lần
   final DateTime? initialDate;
 
   const ScheduleItemDialog({
@@ -29,8 +27,9 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
   late String _title, _location, _startTime, _endTime, _colorHex;
   String? _subjectCode, _lecturer, _notes;
 
-  // --- State mới cho lịch thông minh ---
-  bool _isRecurring = false;
+  // Dùng ValueNotifier để quản lý trạng thái lặp lại, giúp chỉ build lại phần UI cần thiết
+  late final ValueNotifier<bool> _isRecurringNotifier;
+
   int _dayOfWeek = 2; // Mặc định là Thứ Hai
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 90));
@@ -53,10 +52,11 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
     _endTime = item?.endTime ?? _calculateDefaultEndTime(_startTime);
     _colorHex = item?.colorHex ?? '#FF5733';
 
-    // Khởi tạo các giá trị ngày tháng từ `scheduleItem` nếu đang sửa
-    _isRecurring = item?.isRecurring ?? false;
+    final isRecurring = item?.isRecurring ?? false;
+    _isRecurringNotifier = ValueNotifier<bool>(isRecurring);
+
     if (item != null) {
-      if (_isRecurring) {
+      if (isRecurring) {
         _dayOfWeek = item.dayOfWeek ?? 2;
         _startDate = item.startDate ?? DateTime.now();
         _endDate = item.endDate ?? DateTime.now().add(const Duration(days: 90));
@@ -64,9 +64,14 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
         _specificDate = item.specificDate ?? widget.initialDate ?? DateTime.now();
       }
     } else {
-      // Nếu thêm mới, sử dụng initialDate
       _specificDate = widget.initialDate ?? DateTime.now();
     }
+  }
+
+  @override
+  void dispose() {
+    _isRecurringNotifier.dispose();
+    super.dispose();
   }
 
   String _calculateDefaultEndTime(String startTime) {
@@ -171,7 +176,6 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
     }
   }
 
-  // Hàm chọn ngày cho các trường mới
   Future<void> _selectDate(BuildContext context, {required Function(DateTime) onDateSelected, required DateTime initialDate}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -189,6 +193,7 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
       _formKey.currentState!.save();
       setState(() => _isSaving = true);
 
+      final bool isRecurring = _isRecurringNotifier.value;
       final newItem = ScheduleItem(
         id: widget.scheduleItem?.id ?? '',
         title: _title,
@@ -199,12 +204,11 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
         subjectCode: _subjectCode,
         lecturer: _lecturer,
         notes: _notes,
-        // Lưu dữ liệu mới dựa trên lựa chọn
-        isRecurring: _isRecurring,
-        dayOfWeek: _isRecurring ? _dayOfWeek : null,
-        startDate: _isRecurring ? _startDate : null,
-        endDate: _isRecurring ? _endDate : null,
-        specificDate: !_isRecurring ? _specificDate : null,
+        isRecurring: isRecurring,
+        dayOfWeek: isRecurring ? _dayOfWeek : null,
+        startDate: isRecurring ? _startDate : null,
+        endDate: isRecurring ? _endDate : null,
+        specificDate: !isRecurring ? _specificDate : null,
       );
 
       try {
@@ -228,8 +232,8 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = const TextStyle(color: Colors.white);
-    final inputDecorationTheme = const InputDecoration(
+    const textStyle = TextStyle(color: Colors.white);
+    const inputDecorationTheme = InputDecoration(
       labelStyle: TextStyle(color: Colors.white70),
       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
       focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
@@ -238,8 +242,12 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: GlassmorphicContainer(
-        borderRadius: 16,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.14),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
@@ -268,14 +276,30 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
                         validator: (value) => value!.isEmpty ? 'Vui lòng nhập địa điểm' : null,
                         onSaved: (value) => _location = value!,
                       ),
-
                       const SizedBox(height: 16),
                       _buildEventTypeSwitch(),
                       const SizedBox(height: 16),
 
-                      // Hiển thị các ô nhập liệu động
-                      if (_isRecurring) ..._buildRecurringFields(textStyle, inputDecorationTheme)
-                      else ..._buildOneTimeFields(),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _isRecurringNotifier,
+                        builder: (context, isRecurring, child) {
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(sizeFactor: animation, child: child),
+                              );
+                            },
+                            child: Column(
+                              key: ValueKey(isRecurring),
+                              children: isRecurring
+                                  ? _buildRecurringFields(textStyle, inputDecorationTheme)
+                                  : _buildOneTimeFields(),
+                            ),
+                          );
+                        },
+                      ),
 
                       const SizedBox(height: 16),
                       _buildTimeRow('Bắt đầu:', _startTime, () => _selectTime(context, true)),
@@ -309,28 +333,31 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
     );
   }
 
-  //--- CÁC WIDGET HELPER MỚI CHO GIAO DIỆN ĐỘNG ---
-
   Widget _buildEventTypeSwitch() {
-    return GlassmorphicContainer(
-      borderRadius: 30,
-      padding: const EdgeInsets.all(4),
-      opacity: 0.2,
-      child: Row(
-        children: [
-          Expanded(child: _buildSwitchOption('Một lần', !_isRecurring)),
-          Expanded(child: _buildSwitchOption('Lặp lại', _isRecurring)),
-        ],
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isRecurringNotifier,
+      builder: (context, isRecurring, child) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: [
+              Expanded(child: _buildSwitchOption('Một lần', !isRecurring)),
+              Expanded(child: _buildSwitchOption('Lặp lại', isRecurring)),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildSwitchOption(String title, bool isSelected) {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _isRecurring = title == 'Lặp lại';
-        });
+        _isRecurringNotifier.value = (title == 'Lặp lại');
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -389,8 +416,6 @@ class _ScheduleItemDialogState extends State<ScheduleItemDialog> {
       ],
     );
   }
-
-  //--- CÁC WIDGET HELPER CŨ ---
 
   Widget _buildTimeRow(String label, String time, VoidCallback onPressed) {
     return Row(

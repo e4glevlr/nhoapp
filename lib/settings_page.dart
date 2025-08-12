@@ -37,15 +37,18 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Column(
         children: [
           // Header tùy chỉnh thay thế cho AppBar
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Text(
-                "Cài đặt",
-                style: GoogleFonts.inter(
-                    fontSize: 22,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600
-                )
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0), // Thêm padding ngang để chữ không bị dính sát vào cạnh
+              child: Text(
+                  "Cài đặt",
+                  style: GoogleFonts.inter(
+                      fontSize: 22,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600
+                  )
+              ),
             ),
           ),
           // Phần thân của trang cài đặt
@@ -134,7 +137,9 @@ class _SettingsPageState extends State<SettingsPage> {
             inactiveTrackColor: Colors.white.withOpacity(0.2),
             secondary: Icon(Icons.notifications_active_outlined, color: Colors.white),
           ),
-        )
+        ),
+
+
       ],
     );
   }

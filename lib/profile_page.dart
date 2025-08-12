@@ -1,16 +1,21 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Thêm import
-import 'dart:ui'; // Thêm import
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'components/GlassmorphicToggle.dart';
-import 'services/auth_service.dart';
+import 'components/GlassmorphicToggle.dart'; // Giả định bạn có file này
+import 'services/auth_service.dart';      // Giả định bạn có file này
+
+// Thêm các import cần thiết
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:image_cropper/image_cropper.dart'; // MỚI: Import thư viện cropper
 
 
 class ProfilePage extends StatefulWidget {
@@ -22,42 +27,99 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isUploading = false;
-  // Toàn bộ logic xử lý dữ liệu của bạn được giữ nguyên
+  String? _localAvatarPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedAvatar();
+  }
+
+  Future<void> _loadSavedAvatar() async {
+    if (kIsWeb) return;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final avatarFile = File(p.join(appDir.path, 'local_avatar.png'));
+      if (await avatarFile.exists()) {
+        setState(() {
+          _localAvatarPath = avatarFile.path;
+        });
+      }
+    } catch(e) {
+      print("Lỗi khi tải ảnh đã lưu: $e");
+    }
+  }
+
+  /// Mở thư viện, cho phép người dùng chọn, cắt và lưu ảnh đại diện.
   Future<void> _changeAvatar() async {
-    // ... logic giữ nguyên
     if (!mounted) return;
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final user = authService.getCurrentUser();
-    if (user == null) return;
 
     final imagePicker = ImagePicker();
-    final pickedFile = await imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final pickedFile = await imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
 
     if (pickedFile != null) {
-      setState(() => _isUploading = true);
-      try {
-        final storageRef = FirebaseStorage.instance.ref().child('avatars/${user.uid}');
+      // MỚI: Gọi giao diện cắt ảnh
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        uiSettings: [
+          AndroidUiSettings(
+              toolbarTitle: 'Cắt ảnh',
+              toolbarColor: Colors.deepOrange,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: true, // Khóa tỉ lệ hình vuông
+              aspectRatioPresets: [
+                CropAspectRatioPreset.square, // Chỉ cho phép cắt hình vuông
+              ]),
+          IOSUiSettings(
+            title: 'Cắt ảnh',
+            aspectRatioLockEnabled: true,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+            ],
+          ),
+        ],
+      );
+
+      // Nếu người dùng đã cắt ảnh (không phải hủy bỏ)
+      if (croppedFile != null) {
         if (kIsWeb) {
-          await storageRef.putData(await pickedFile.readAsBytes());
-        } else {
-          await storageRef.putFile(File(pickedFile.path));
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Tính năng lưu ảnh chưa hỗ trợ trên web.")));
+          return;
         }
-        final downloadUrl = await storageRef.getDownloadURL();
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'photoUrl': downloadUrl});
-        await user.updatePhotoURL(downloadUrl);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cập nhật ảnh đại diện thành công!")));
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Lỗi tải ảnh lên: $e")));
-      } finally {
-        if(mounted) setState(() => _isUploading = false);
+
+        setState(() => _isUploading = true);
+        try {
+          final appDir = await getApplicationDocumentsDirectory();
+          const fileName = 'local_avatar.png';
+          final savedAvatarPath = p.join(appDir.path, fileName);
+
+          // Lưu file đã được cắt
+          await File(croppedFile.path).copy(savedAvatarPath);
+
+          final imageProvider = FileImage(File(savedAvatarPath));
+          await imageProvider.evict(); // Xóa cache
+
+          setState(() {
+            _localAvatarPath = savedAvatarPath;
+          });
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Cập nhật ảnh đại diện thành công!")));
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Lỗi lưu ảnh: $e")));
+        } finally {
+          if (mounted) setState(() => _isUploading = false);
+        }
       }
     }
   }
 
+  /// Tạo dữ liệu người dùng trên Firestore nếu chưa tồn tại.
   Future<void> _createUserDataIfMissing(User user) async {
-    // ... logic giữ nguyên
     final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     final doc = await userRef.get();
     if (!doc.exists) {
@@ -72,11 +134,10 @@ class _ProfilePageState extends State<ProfilePage> {
           'settings': {'pushNotificationsEnabled': true},
         });
       } catch (e) {
-        print("Error creating user document: $e");
+        print("Lỗi tạo dữ liệu người dùng: $e");
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -84,73 +145,77 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = authService.getCurrentUser();
 
     if (user == null) {
-      // Vẫn cần một trang chờ cơ bản
       return const Scaffold(body: Center(child: Text("Không tìm thấy người dùng.")));
     }
 
-    // ÁP DỤNG NỀN ĐỘNG CHO TOÀN BỘ TRANG
     return Scaffold(
-        backgroundColor: Colors.transparent, // Nền trong suốt để thấy gradient
-        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
-          builder: (context, snapshot) {
-            // Các trạng thái loading, error cần style lại để thấy trên nền tối
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: Colors.white));
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text("Lỗi: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
-            }
-            if (!snapshot.hasData || !snapshot.data!.exists) {
-              return FutureBuilder(
-                future: _createUserDataIfMissing(user),
-                builder: (context, futureSnapshot) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(color: Colors.white),
-                        SizedBox(height: 16),
-                        Text("Đang khởi tạo dữ liệu...", style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  );
-                },
-              );
-            }
-            final userData = snapshot.data!.data()!;
-            final displayName = userData['displayName'] ?? 'Người dùng mới';
-            final email = userData['email'] ?? '';
-            final photoUrl = userData['photoUrl'] as String?;
-            final stats = userData['learningStats'] as Map<String, dynamic>? ?? {};
-            final wordsLearned = stats['wordsLearned'] ?? 0;
-            final streakDays = stats['streakDays'] ?? 0;
-            final achievements = stats['achievements'] ?? 0;
-
-            return SafeArea(
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _buildHeader(context, displayName, email, photoUrl),
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && _localAvatarPath == null) {
+            return const Center(child: CircularProgressIndicator(color: Colors.white));
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text("Lỗi: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
+          }
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return FutureBuilder(
+              future: _createUserDataIfMissing(user),
+              builder: (context, futureSnapshot) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 16),
+                      Text("Đang khởi tạo dữ liệu...", style: TextStyle(color: Colors.white)),
+                    ],
                   ),
-                  SliverToBoxAdapter(
-                    child: _buildStatsCard(wordsLearned, streakDays, achievements),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _buildOptionsList(context, authService),
-                  ),
-                ],
-              ),
+                );
+              },
             );
-          },
-        ),
+          }
+          final userData = snapshot.data!.data()!;
+          final displayName = userData['displayName'] ?? 'Người dùng mới';
+          final email = userData['email'] ?? '';
+          final photoUrl = userData['photoUrl'] as String?;
+          final stats = userData['learningStats'] as Map<String, dynamic>? ?? {};
+          final wordsLearned = stats['wordsLearned'] ?? 0;
+          final streakDays = stats['streakDays'] ?? 0;
+          final achievements = stats['achievements'] ?? 0;
+
+          return SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _buildHeader(context, displayName, email, photoUrl),
+                ),
+                SliverToBoxAdapter(
+                  child: _buildStatsCard(wordsLearned, streakDays, achievements),
+                ),
+                SliverToBoxAdapter(
+                  child: _buildOptionsList(context, authService),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
-  // ----- CÁC WIDGET GIAO DIỆN ĐƯỢC STYLE LẠI -----
-
+  /// Widget xây dựng phần header của trang cá nhân.
   Widget _buildHeader(BuildContext context, String name, String email, String? photoUrl) {
-    // Bỏ container cũ, đặt trực tiếp lên nền gradient
+    ImageProvider? backgroundImage;
+
+    if (_localAvatarPath != null) {
+      backgroundImage = FileImage(File(_localAvatarPath!));
+    }
+    else if (photoUrl != null) {
+      backgroundImage = CachedNetworkImageProvider(photoUrl);
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       child: Column(
@@ -168,8 +233,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.white.withOpacity(0.1),
-                    backgroundImage: (photoUrl != null) ? CachedNetworkImageProvider(photoUrl) : null,
-                    child: (photoUrl == null && !_isUploading)
+                    backgroundImage: backgroundImage,
+                    child: (backgroundImage == null && !_isUploading)
                         ? const Icon(Icons.person, size: 50, color: Colors.white70)
                         : null,
                   ),
@@ -193,6 +258,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Các widget con còn lại không thay đổi
   Widget _buildStatsCard(int words, int streak, int achievements) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -213,7 +279,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildStatItem(IconData icon, String value, String label) {
-    // Style lại với màu trắng
     return Column(
       children: [
         Icon(icon, color: Colors.white, size: 30),
@@ -226,11 +291,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildOptionsList(BuildContext context, AuthService authService) {
-    // Sử dụng GlassmorphicContainer
     return Padding(
       padding: const EdgeInsets.all(20),
-      child:
-      GlassmorphicContainer(
+      child: GlassmorphicContainer(
         child: Column(
           children: [
             _buildOptionItem(context, icon: Icons.person_outline, title: "Chỉnh sửa hồ sơ", onTap: () {}),
@@ -243,7 +306,7 @@ class _ProfilePageState extends State<ProfilePage> {
               context,
               icon: Icons.logout,
               title: "Đăng xuất",
-              color: const Color(0xFFFF7B7B), // Màu đỏ tươi hơn
+              color: const Color(0xFFFF7B7B),
               onTap: () async {
                 await authService.signOut();
               },
@@ -255,7 +318,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildOptionItem(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap, Color? color}) {
-    // Style lại ListTile
     final itemColor = color ?? Colors.white;
     return ListTile(
       shape: RoundedRectangleBorder(

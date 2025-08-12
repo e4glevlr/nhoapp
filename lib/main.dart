@@ -32,6 +32,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Alda App',
+        showPerformanceOverlay: true,
         theme: ThemeData(
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,

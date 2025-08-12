@@ -2,13 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/chat_message.dart';
-import 'glassmorphic_container.dart';
+import 'package:gioapp/components/GlassmorphicToggle.dart';
 
 class ChatViewSection extends StatelessWidget {
   final List<ChatMessage> messages;
   final TextEditingController chatController;
   final VoidCallback onSendMessage;
   final bool isSendingToBot;
+  final bool isMicEnabled;
+  final bool isListening;
+  final VoidCallback onMicTap;
 
   const ChatViewSection({
     Key? key,
@@ -16,6 +19,9 @@ class ChatViewSection extends StatelessWidget {
     required this.chatController,
     required this.onSendMessage,
     required this.isSendingToBot,
+    required this.isMicEnabled,
+    required this.isListening,
+    required this.onMicTap,
   }) : super(key: key);
 
   @override
@@ -36,7 +42,7 @@ class ChatViewSection extends StatelessWidget {
     return Expanded(
       flex: 2,
       child: GlassmorphicContainer(
-        margin: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
+        // margin: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
         child: Column(
           children: [
             Expanded(
@@ -60,6 +66,9 @@ class ChatViewSection extends StatelessWidget {
             _ChatInputArea(
               chatController: chatController,
               onSendMessage: onSendMessage,
+              isMicEnabled: isMicEnabled,
+              isListening: isListening,
+              onMicTap: onMicTap,
             ),
           ],
         ),
@@ -99,8 +108,11 @@ class _ChatMessageBubble extends StatelessWidget {
 class _ChatInputArea extends StatelessWidget {
   final TextEditingController chatController;
   final VoidCallback onSendMessage;
+  final bool isMicEnabled;
+  final bool isListening;
+  final VoidCallback onMicTap;
 
-  const _ChatInputArea({Key? key, required this.chatController, required this.onSendMessage}) : super(key: key);
+  const _ChatInputArea({Key? key, required this.chatController, required this.onSendMessage, required this.isMicEnabled, required this.isListening, required this.onMicTap}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +133,14 @@ class _ChatInputArea extends StatelessWidget {
               ),
               onSubmitted: (_) => onSendMessage(),
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
+              color: isMicEnabled ? Colors.white : Colors.white54,
+            ),
+            onPressed: isMicEnabled ? onMicTap : null,
+            tooltip: isListening ? 'Tắt mic' : 'Bật mic',
           ),
           IconButton(
             icon: const Icon(Icons.send_rounded, color: Colors.white),

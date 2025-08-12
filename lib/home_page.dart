@@ -10,6 +10,7 @@ import 'settings_page.dart';
 import 'schedule_page.dart';
 import 'voice_page.dart';
 import 'helpers/navigation_helper.dart';
+import 'components/GlassmorphicToggle.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -51,9 +52,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
 
+  // 1. Đơn giản hóa AnimationController
+  // Controller này giờ chỉ cần chạy từ 0.0 đến 1.0 và ngược lại để điều khiển opacity.
   late AnimationController _controller;
-  late Animation<Alignment> _topAlignmentAnimation;
-  late Animation<Alignment> _bottomAlignmentAnimation;
 
   final List<Widget> _pages = [
     HomePageContent(),
@@ -72,38 +73,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _controller =
-    AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8), // Thời gian chuyển đổi giữa 2 màu
+    )..repeat(reverse: true); // Lặp lại và đảo ngược (mờ dần -> hiện rõ -> mờ dần...)
 
-    _topAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft),
-          weight: 1),
-    ]).animate(_controller);
-
-    _bottomAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.bottomLeft, end: Alignment.topLeft),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.topLeft, end: Alignment.topRight),
-          weight: 1),
-      TweenSequenceItem<Alignment>(
-          tween: Tween<Alignment>(begin: Alignment.topRight, end: Alignment.bottomRight),
-          weight: 1),
-    ]).animate(_controller);
+    // 2. Xóa các TweenSequence không cần thiết
+    // _topAlignmentAnimation và _bottomAlignmentAnimation đã được loại bỏ.
   }
 
   @override
@@ -114,25 +90,39 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    // 3. Dùng Stack để xếp chồng các lớp gradient và UI
     return Stack(
       children: [
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: const [Color(0xFF6a11cb), Color(0xFF2575fc)],
-                  begin: _topAlignmentAnimation.value,
-                  end: _bottomAlignmentAnimation.value,
-                ),
-              ),
-            );
-          },
+        // Lớp Gradient 1 (nền cố định)
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF6a11cb), Color(0xFF2575fc)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
         ),
 
+        // Lớp Gradient 2 (lớp này sẽ mờ đi và hiện ra)
+        FadeTransition(
+          // Dùng FadeTransition để animate opacity một cách hiệu quả
+          opacity: _controller,
+          child: Container(
+            decoration: const BoxDecoration(
+              // Bạn có thể đổi bộ màu này để tạo hiệu ứng mong muốn
+              gradient: LinearGradient(
+                colors: [Color(0xFFff7ab6), Color(0xFF6ea8fe)],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+            ),
+          ),
+        ),
+
+        // Lớp UI (Scaffold) nằm trên cùng
         Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.transparent, // QUAN TRỌNG: Phải trong suốt để thấy nền
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 350),
             transitionBuilder: (child, animation) {
@@ -325,28 +315,7 @@ class HomePageContent extends StatelessWidget {
   }
 }
 
-class GlassmorphicContainer extends StatelessWidget {
-  final Widget child;
-  const GlassmorphicContainer({super.key, required this.child});
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16.0),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(width: 1.5, color: Colors.white.withOpacity(0.16)),
-            boxShadow: [BoxShadow(offset: const Offset(0, 10), blurRadius: 30, color: const Color(0xFF0F173A).withOpacity(0.35))],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
+
 
 class PrimaryCtaButton extends StatelessWidget {
   final String text;

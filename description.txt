@@ -1,0 +1,88 @@
+This is a Flutter-based mobile application that provides a multi-functional user experience, including a chat interface, document management, and voice interaction capabilities. The app is structured with a clear and intuitive user interface, allowing users to easily navigate between different features.
+
+### Core Features:
+
+1.  **Chat with Bot:**
+    *   Users can engage in real-time conversations with an AI-powered chatbot.
+    *   The chat interface supports sending and receiving text messages, with a clear distinction between user and bot messages.
+
+    *   Messages are sent to a backend service for processing, and the bot's responses are displayed in the chat window.
+
+2.  **Document Management:**
+    *   Users can add, view, and manage various types of documents, including `.txt`, `.docx`, `.pdf`, `.jpg`, and `.png` files.
+    *   The app provides a user-friendly grid view for displaying documents, with icons representing different file types.
+    *   Users can preview the content of text and `.docx` files directly within the app.
+
+3.  **Voice Interaction:**
+    *   The app includes a voice chat feature that allows users to interact with the bot using their voice.
+    *   It utilizes speech-to-text technology to convert spoken language into text, which is then sent to the bot.
+    *   The bot's text responses are converted back to speech using text-to-speech, providing a hands-free user experience.
+    *   The voice interaction feature also integrates with the device's camera, allowing users to send images along with their voice commands.
+
+4.  **Video Streaming and Real-Time Communication:**
+    *   The app has a video streaming feature that uses WebRTC to establish a peer-to-peer connection for real-time video and audio communication.
+    *   It includes a chat interface that allows users to send and receive messages while in a video session.
+    *   The video streaming functionality is designed for interactive sessions, with controls for starting and stopping the stream.
+
+### User Interface and Navigation:
+
+*   The app's home page serves as a central hub, providing access to all the main features through a clean and organized layout.
+*   It includes a bottom navigation bar for easy switching between different sections of the app, such as the home page, user profile, notifications, and settings.
+*   The UI is designed to be visually appealing and user-friendly, with a consistent color scheme and modern design elements.
+
+### Technical Details:
+
+*   The app is built using the Flutter framework, allowing for cross-platform compatibility on both Android and iOS devices.
+*   It integrates with various external APIs for features like chat, voice recognition, and video streaming.
+*   The app handles permissions for accessing the device's camera and microphone, ensuring a secure and privacy-conscious user experience.
+
+This application is a comprehensive tool that combines communication, productivity, and entertainment features into a single, easy-to-use package. Its modular design and rich feature set make it a versatile solution for a wide range of use cases.
+
+gemini "Với vai trò là một kiến trúc sư giải pháp chuyên về Flutter và Firebase, hãy lập một kế hoạch tổng thể để tích
+hợp tính năng người dùng (xác thực, hồ sơ, cài đặt) cho một ứng dụng Flutter đa chức năng có chat,
+quản lý tài liệu và tương tác giọng nói. Kế hoạch cần nêu rõ sẽ sử dụng những dịch vụ nào của Firebase (Firebase Authentication,
+Cloud Firestore, Firebase Storage) và vai trò của từng dịch vụ trong giải pháp này."
+
+
+gemini "Hãy viết một bản kế hoạch chi tiết để triển khai tính năng Đăng ký và Đăng nhập cho ứng dụng Flutter bằng Firebase Authentication. Yêu cầu bao gồm:
+1. Các bước thực hiện luồng đăng ký bằng email/mật khẩu.
+2. Quy trình tạo một document người dùng tương ứng trong Cloud Firestore ngay sau khi đăng ký thành công.
+3. Các bước thực hiện luồng đăng nhập.
+4. Cách quản lý trạng thái đăng nhập trong ứng dụng Flutter để tự động điều hướng người dùng."
+
+gemini "Thiết kế chi tiết cho tính năng 'Hồ sơ người dùng' (User Profile) trong Flutter sử dụng Firebase.
+Yêu cầu: 1. Đề xuất cấu trúc dữ liệu (data model) cho collection 'users' trong Cloud Firestore, bao gồm các trường như displayName, email, photoUrl, và createdAt.
+2. Mô tả quy trình từng bước để người dùng tải lên và cập nhật ảnh đại diện (avatar), bao gồm việc sử dụng Firebase Storage để lưu file và cập nhật URL vào Firestore.
+3. Cung cấp đoạn mã Dart mẫu để đọc và cập nhật dữ liệu hồ sơ."
+
+gemini "Hãy viết một lớp dịch vụ xác thực (Authentication Service) hoàn chỉnh bằng Dart cho một ứng dụng Flutter sử dụng Firebase. Lớp này nên có tên là 'AuthService' và bao gồm các phương thức sau:
+1. signUp(email, password, displayName): Đăng ký người dùng mới bằng Firebase Auth, sau đó tạo một document cho người dùng trong collection 'users' trên Firestore với email và displayName.
+2. signIn(email, password): Đăng nhập người dùng.
+3. signOut(): Đăng xuất người dùng.
+4. authStateChanges(): Một Stream để lắng nghe và trả về trạng thái đăng nhập của người dùng. Toàn bộ code phải sạch, có comment giải thích và tuân thủ các best practice trong Flutter."
+
+
+gemini "Với vai trò là một lập trình viên Flutter, hãy viết code hoàn chỉnh cho file 'profile_page.dart'. Yêu cầu:
+1. Trang này là một StatefulWidget.
+2. Sử dụng Provider để lấy AuthService và thông tin người dùng hiện tại (currentUser).
+3. Sử dụng FutureBuilder để đọc document của người dùng từ collection 'users' trên Cloud Firestore dựa trên UID.
+4. Hiển thị 'displayName' và 'email' của người dùng. 5. Thêm một nút 'Đăng xuất' (Logout) để gọi phương thức signOut() từ AuthService.
+6. Hiển thị một vòng tròn loading trong khi chờ dữ liệu."
+
+gemini "Hãy viết code hoàn chỉnh cho file 'settings_page.dart'. Yêu cầu:
+1. Trang này là một StatefulWidget.
+2. Lấy thông tin người dùng hiện tại từ AuthService qua Provider.
+3. Sử dụng StreamBuilder để lắng nghe real-time các thay đổi trong document của người dùng trên collection 'users' của Firestore.
+4. Hiển thị một SwitchListTile cho cài đặt 'pushNotificationsEnabled'. Giá trị của switch phải phản ánh dữ liệu từ Firestore.
+5. Khi người dùng gạt switch, hãy cập nhật ngay lập tức trường 'settings.pushNotificationsEnabled' trong document Firestore của họ.
+6. Giao diện phải xử lý được trường hợp người dùng mới chưa có object 'settings'
+7. Tính năng đăng xuất"
+
+gemini "Hãy viết code hoàn chỉnh cho file 'notifications_page.dart'. Yêu cầu:
+1. Trang này là một StatelessWidget.
+2. Thiết kế một giao diện đơn giản, hiển thị ở giữa màn hình.
+3. Giao diện bao gồm một Icon (ví dụ: Icons.notifications_off_outlined) và một dòng chữ 'Chưa có thông báo nào' để thông báo cho người dùng rằng tính năng này chưa có dữ liệu."
+
+
+Thiết lập Provider trong main.dart
+

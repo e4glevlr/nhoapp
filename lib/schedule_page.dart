@@ -10,7 +10,7 @@ import 'models/schedule_item.dart';
 import 'services/schedule_service.dart';
 import 'services/auth_service.dart';
 import 'widgets/schedule_item_dialog.dart';
-import 'widgets/glassmorphic_container.dart';
+import 'components/GlassmorphicToggle.dart'; // Assuming this is your custom glass container
 
 class SchedulePage extends StatefulWidget {
   const SchedulePage({Key? key}) : super(key: key);
@@ -56,23 +56,16 @@ class _SchedulePageState extends State<SchedulePage>
 
   /// Ánh xạ danh sách các ScheduleItem từ Firestore thành các sự kiện
   /// mà thư viện lịch có thể hiển thị.
-  /// Hỗ trợ cả sự kiện lặp lại trong khoảng thời gian và sự kiện một lần.
   List<NeatCleanCalendarEvent> _mapScheduleItemsToCalendarEvents(List<ScheduleItem> items) {
     final List<NeatCleanCalendarEvent> newEvents = [];
 
     for (final item in items) {
       if (item.isRecurring) {
-        // Xử lý sự kiện lặp lại có giới hạn thời gian
         if (item.startDate != null && item.endDate != null && item.dayOfWeek != null) {
-          // Lặp qua từng ngày trong khoảng thời gian đã cho
           for (var day = item.startDate!; day.isBefore(item.endDate!.add(const Duration(days: 1))); day = day.add(const Duration(days: 1))) {
-
-            // Chuyển đổi weekday của DateTime (1=T2, 7=CN) sang
-            // quy ước của chúng ta (2=T2, 1=CN)
             int currentDayOfWeek = (day.weekday == 7) ? 1 : day.weekday + 1;
 
             if (currentDayOfWeek == item.dayOfWeek) {
-              // Nếu đúng thứ trong tuần, tạo sự kiện
               try {
                 final startTimeParts = item.startTime.split(':');
                 final endTimeParts = item.endTime.split(':');
@@ -92,7 +85,6 @@ class _SchedulePageState extends State<SchedulePage>
           }
         }
       } else {
-        // Xử lý sự kiện chỉ diễn ra một lần
         if (item.specificDate != null) {
           try {
             final startTimeParts = item.startTime.split(':');
@@ -124,6 +116,35 @@ class _SchedulePageState extends State<SchedulePage>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // SỬA ĐỔI: Thêm FloatingActionButton
+      floatingActionButton: user == null
+          ? null
+          : Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+        ),
+        child: IconButton(
+          icon: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 30,
+          ),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (_) => ScheduleItemDialog(
+                userId: user.uid,
+                initialDate: _selectedDate,
+              ),
+            );
+          },
+          tooltip: 'Thêm Lịch học',
+        ),
+      ),
       body: AnimatedBuilder(
         animation: _animationController,
         builder: (context, _) {
@@ -165,16 +186,19 @@ class _SchedulePageState extends State<SchedulePage>
   Widget _buildLoginPrompt() {
     return Center(
       child: GlassmorphicContainer(
-        padding: const EdgeInsets.all(24),
         borderRadius: 24.0,
-        child: const Text(
-          "Vui lòng đăng nhập để xem lịch học.",
-          style: TextStyle(color: Colors.white, fontSize: 16),
+        child: const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            "Vui lòng đăng nhập để xem lịch học.",
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
         ),
       ),
     );
   }
 
+  // SỬA ĐỔI: AppBar giờ chỉ còn nút Quay lại
   Widget _buildCustomAppBar(BuildContext context, String userId) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
@@ -191,30 +215,6 @@ class _SchedulePageState extends State<SchedulePage>
                 tooltip: 'Quay lại',
               ),
             ),
-            const Text(
-              'Thời Khóa Biểu',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  shadows: [Shadow(blurRadius: 5.0, color: Colors.black26)]),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 30),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => ScheduleItemDialog(
-                      userId: userId,
-                      initialDate: _selectedDate, // Truyền ngày đang được chọn vào dialog
-                    ),
-                  );
-                },
-                tooltip: 'Thêm Lịch học',
-              ),
-            ),
           ],
         ),
       ),
@@ -229,7 +229,7 @@ class _SchedulePageState extends State<SchedulePage>
       isExpandable: true,
       locale: 'vi_VN',
       isExpanded: true,
-      onPrintLog: (log) {}, // Tắt log để giữ console sạch sẽ
+      onPrintLog: (log) {},
       dayOfWeekStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
       bottomBarTextStyle: const TextStyle(color: Colors.white),
       bottomBarArrowColor: Colors.white,
@@ -296,7 +296,6 @@ class _SchedulePageState extends State<SchedulePage>
         margin: const EdgeInsets.symmetric(vertical: 5.0),
         child: GlassmorphicContainer(
           borderRadius: 12,
-          opacity: 0.25,
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

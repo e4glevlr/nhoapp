@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/animation.dart';
+import 'components/GlassmorphicToggle.dart' as gm;
 
 void main() {
   runApp(const MaterialApp(
@@ -31,10 +32,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   final List<Message> _messages = [];
   final ScrollController _scrollController = ScrollController();
 
-  // Thêm AnimationController cho nền động
   late AnimationController _animationController;
-  late Animation<Alignment> _topAlignmentAnimation;
-  late Animation<Alignment> _bottomAlignmentAnimation;
+  // THAY ĐỔI: Xóa các animation không cần thiết cho gradient
+  // late Animation<Alignment> _topAlignmentAnimation;
+  // late Animation<Alignment> _bottomAlignmentAnimation;
 
   final String userId = "user123";
   final String sessionId = "session123";
@@ -42,20 +43,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    // Khởi tạo animation
-    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 15))..repeat();
-    _topAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem(tween: Tween(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
-    ]).animate(_animationController);
-    _bottomAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
-    ]).animate(_animationController);
+    // THAY ĐỔI: Đơn giản hóa AnimationController để điều khiển opacity
+    _animationController = AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 10)
+    )..repeat(reverse: true); // Lặp lại và đảo ngược (mờ dần -> hiện rõ)
   }
 
   @override
@@ -121,69 +113,26 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     });
   }
 
-  // --- CÁC WIDGET GIAO DIỆN ĐƯỢC STYLE LẠI ---
-
-  // Widget mới cho bong bóng chat kiểu glassmorphism
   Widget _buildGlassMessageBubble(Message message) {
     final bubbleAlignment = message.isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final bubbleColor = message.isUser
-        ? Colors.white.withOpacity(0.15)
-        : Colors.white.withOpacity(0.08);
-
-    final bubbleBorderRadius = message.isUser
-        ? const BorderRadius.only(
-      topLeft: Radius.circular(20),
-      topRight: Radius.circular(20),
-      bottomLeft: Radius.circular(20),
-    )
-        : const BorderRadius.only(
-      topLeft: Radius.circular(20),
-      topRight: Radius.circular(20),
-      bottomRight: Radius.circular(20),
-    );
-
     return Align(
       alignment: bubbleAlignment,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.0, end: 1.0),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
-        builder: (context, value, child) {
-          return Opacity(
-            opacity: value,
-            child: Transform.translate(
-              offset: Offset(0, 20 * (1 - value)),
-              child: child,
-            ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: bubbleBorderRadius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        builder: (context, value, child) => Opacity(opacity: value, child: Transform.translate(offset: Offset(0, 20 * (1 - value)), child: child)),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+          child: gm.GlassmorphicContainer(
+            isPerformanceMode: true,
+            borderRadius: 20,
+            child: Padding(
               padding: const EdgeInsets.all(14),
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: bubbleBorderRadius,
-                border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                    offset: const Offset(2, 2),
-                  ),
-                ],
-              ),
               child: Text(
                 message.text,
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 15,
-                  height: 1.4,
-                ),
+                style: GoogleFonts.inter(color: Colors.white, fontSize: 15, height: 1.4),
               ),
             ),
           ),
@@ -192,61 +141,47 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Widget mới cho khung nhập liệu kiểu glassmorphism
   Widget _buildTextInputArea() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(50),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: const TextStyle(color: Colors.white),
-                    cursorColor: Colors.white,
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      hintText: "Nhập tin nhắn...",
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                    ),
-                    onSubmitted: (text) {
-                      if (text.trim().isNotEmpty) sendMessage(text.trim());
-                    },
+      child: gm.GlassmorphicContainer(
+        isPerformanceMode: true,
+        borderRadius: 50,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: Colors.white,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: "Nhập tin nhắn...",
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
                   ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    final text = _controller.text.trim();
-                    if (text.isNotEmpty) sendMessage(text);
+                  onSubmitted: (text) {
+                    if (text.trim().isNotEmpty) sendMessage(text.trim());
                   },
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 6,
-                          offset: const Offset(2, 2),
-                        )
-                      ],
-                    ),
-                    child: const Icon(Icons.send, color: Colors.white, size: 20),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  final text = _controller.text.trim();
+                  if (text.isNotEmpty) sendMessage(text);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.2),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 6, offset: const Offset(2, 2))],
                   ),
-                )
-              ],
-            ),
+                  child: const Icon(Icons.send, color: Colors.white, size: 20),
+                ),
+              )
+            ],
           ),
         ),
       ),
@@ -255,45 +190,85 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
+    // THAY ĐỔI: Sử dụng Stack để xếp chồng 2 lớp gradient và giao diện
+    return Stack(
+      children: [
+        // Lớp nền 1 (cố định)
+        Container(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: const [Color(0xFF6a11cb), Color(0xFF2575fc)],
-              begin: _topAlignmentAnimation.value,
-              end: _bottomAlignmentAnimation.value,
+              colors: [Color(0xFF6a11cb), Color(0xFF2575fc)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-          child: child,
-        );
-      },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(
-            "💬 Chat với Bot",
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
-          ),
-          backgroundColor: Colors.white.withOpacity(0.05),
-          elevation: 0,
-          centerTitle: true,
         ),
-        body: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(8),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) => _buildGlassMessageBubble(_messages[index]),
+        // Lớp nền 2 (chuyển động mờ dần)
+        FadeTransition(
+          opacity: _animationController,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFff7ab6), Color(0xFF6ea8fe)],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
               ),
             ),
-            _buildTextInputArea(),
-          ],
+          ),
         ),
-      ),
+
+        // Lớp giao diện Scaffold nằm trên cùng
+        Scaffold(
+          backgroundColor: Colors.transparent, // Rất quan trọng!
+
+          body: Padding(
+            padding: const EdgeInsets.only(top: 32.0),
+            child: Column(
+              children: [
+              // Header ẩn + nút back kính mờ
+              SizedBox(
+                height: kToolbarHeight,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16, top: 8),
+                        child: gm.GlassmorphicContainer(
+                          borderOpacity: 0.12,
+                          borderWidth: 1,
+                          borderRadius: 50,
+                          blurSigma: 14,
+                          isPerformanceMode: false,
+                          child: SizedBox.square(
+                            dimension: 44,
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                              onPressed: () => Navigator.of(context).pop(),
+                              tooltip: 'Quay lại',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(8),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) => _buildGlassMessageBubble(_messages[index]),
+                ),
+              ),
+              _buildTextInputArea(),
+            ],
+          ),
+        ),
+        ),
+      ],
     );
   }
 }

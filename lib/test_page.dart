@@ -1,7 +1,5 @@
 // lib/pages/test_page.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
 
 // Giả định các file này đã được tạo và có logic như bạn cung cấp
 import '../services/webrtc_service.dart';
@@ -13,6 +11,7 @@ import '../models/chat_message.dart';
 import '../widgets/video_view_section.dart';
 import '../widgets/chat_view_section.dart';
 import '../widgets/control_buttons.dart';
+import 'components/GlassmorphicToggle.dart';
 
 class TestPage extends StatefulWidget {
   const TestPage({Key? key}) : super(key: key);
@@ -21,11 +20,7 @@ class TestPage extends StatefulWidget {
   State<TestPage> createState() => _TestPageState();
 }
 
-class _TestPageState extends State<TestPage> with SingleTickerProviderStateMixin {
-  // Thêm AnimationController cho nền động
-  late AnimationController _animationController;
-  late Animation<Alignment> _topAlignmentAnimation;
-  late Animation<Alignment> _bottomAlignmentAnimation;
+class _TestPageState extends State<TestPage> {
 
   // Khởi tạo các services
   late final WebRtcService _webRtcService;
@@ -42,7 +37,6 @@ class _TestPageState extends State<TestPage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _initializeAnimation();
 
     _webRtcService = WebRtcService();
     _webRtcService.addListener(_updateUI);
@@ -55,25 +49,10 @@ class _TestPageState extends State<TestPage> with SingleTickerProviderStateMixin
     _speechService.initSpeech();
   }
 
-  void _initializeAnimation() {
-    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 15))..repeat();
-    _topAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem(tween: Tween(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
-    ]).animate(_animationController);
-    _bottomAlignmentAnimation = TweenSequence<Alignment>([
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomRight, end: Alignment.bottomLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.bottomLeft, end: Alignment.topLeft), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topLeft, end: Alignment.topRight), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: Alignment.topRight, end: Alignment.bottomRight), weight: 1),
-    ]).animate(_animationController);
-  }
+  
 
   @override
   void dispose() {
-    _animationController.dispose();
     _webRtcService.removeListener(_updateUI);
     _speechService.removeListener(_updateUI);
     _webRtcService.dispose();
@@ -82,12 +61,7 @@ class _TestPageState extends State<TestPage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  @override
-  void reassemble() {
-    super.reassemble();
-    _animationController.dispose();
-    _initializeAnimation();
-  }
+  
 
   void _updateUI() {
     if (mounted) setState(() {});
@@ -132,72 +106,96 @@ class _TestPageState extends State<TestPage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: const [Color(0xFF6a11cb), Color(0xFF2575fc)],
-              begin: _topAlignmentAnimation.value,
-              end: _bottomAlignmentAnimation.value,
-            ),
-          ),
-          child: child,
-        );
-      },
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF6a11cb), Color(0xFF2575fc)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text("Trò chuyện cùng ALDA", style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+        appBar: null,
         body: SafeArea(
-          child: Column(
-            children: [
-              VideoViewSection(
-                renderer: _webRtcService.renderer,
-                status: _webRtcService.status,
-                isLoading: _webRtcService.isLoading,
-                isListening: _speechService.isListening,
-                errorMessage: _webRtcService.errorMessage,
-              ),
-              ControlButtons(
-                isLoading: _webRtcService.isLoading,
-                isConnected: _webRtcService.isConnected,
-                onConnect: _webRtcService.connect,
-                onDisconnect: _webRtcService.disconnect,
-              ),
-              ChatViewSection(
-                messages: _messages,
-                chatController: _chatController,
-                onSendMessage: _sendMessage,
-                isSendingToBot: _isSendingToBot,
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: (_speechService.speechEnabled && !_isSendingToBot) ? _speechService.handleMicTap : null,
-          backgroundColor: _speechService.isListening ? Colors.redAccent.withOpacity(0.9) : Colors.white.withOpacity(0.25),
-          elevation: 2,
-          shape: const CircleBorder(),
-          child: Icon(_speechService.isListening ? Icons.mic_off_rounded : Icons.mic_rounded, color: Colors.white),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: BottomAppBar(
-              shape: const CircularNotchedRectangle(),
-              notchMargin: 8.0,
-              color: Colors.white.withOpacity(0.1),
-              elevation: 0,
-              child: Container(height: 40.0),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              children: [
+                // Header ẩn (chỉ có nút quay lại ở góc trên trái như schedule_page)
+                SizedBox(
+                  height: kToolbarHeight,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 0),
+                          child: GlassmorphicContainer(
+                            borderOpacity: 0.12,
+                            borderWidth: 1,
+                            borderRadius: 50,
+                            blurSigma: 14,
+                            isPerformanceMode: false,
+                            child: SizedBox.square(
+                              dimension: 44,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: () => Navigator.of(context).pop(),
+                                tooltip: 'Quay lại',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Khu vực video
+                VideoViewSection(
+                  renderer: _webRtcService.renderer,
+                  status: _webRtcService.status,
+                  isLoading: _webRtcService.isLoading,
+                  isListening: _speechService.isListening,
+                  errorMessage: _webRtcService.errorMessage,
+                ),
+                const SizedBox(height: 8),
+                // Nút điều khiển trong khung kính mờ
+                GlassmorphicContainer(
+                  borderRadius: 20,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: ControlButtons(
+                      isLoading: _webRtcService.isLoading,
+                      isConnected: _webRtcService.isConnected,
+                      onConnect: _webRtcService.connect,
+                      onDisconnect: _webRtcService.disconnect,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Khu vực chat (đã có kính mờ bên trong)
+                ChatViewSection(
+                  messages: _messages,
+                  chatController: _chatController,
+                  onSendMessage: _sendMessage,
+                  isSendingToBot: _isSendingToBot,
+                  isMicEnabled: _speechService.speechEnabled && !_isSendingToBot,
+                  isListening: _speechService.isListening,
+                  onMicTap: _speechService.handleMicTap,
+                ),
+              ],
             ),
           ),
         ),
+        floatingActionButton: null,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+        bottomNavigationBar: null,
       ),
     );
   }

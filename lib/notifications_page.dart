@@ -18,10 +18,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return SafeArea(
       child: Column(
         children: [
-          // Header tùy chỉnh thay thế cho AppBar
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Text("Thông báo", style: GoogleFonts.inter(fontSize: 22, color: Colors.white, fontWeight: FontWeight.w600)),
+
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+              child: Text("Thông báo", style: GoogleFonts.inter(fontSize: 22, color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
           ),
           Expanded(
             child: Center(

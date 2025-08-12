@@ -313,16 +313,20 @@ class _VoiceChatPageState extends State<VoiceChatPage>
             ),
           ),
 
-          // LỚP 3: NÚT QUAY LẠI (LUÔN Ở TRÊN CÙNG)
+          // LỚP 3: NÚT QUAY LẠI (LUÔN Ở TRÊN CÙNG) - kính mờ tròn 44 tương tự trang khác
           Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
+            top: MediaQuery.of(context).padding.top + ((kToolbarHeight - 44) / 2) + 8,
             left: 16,
-            child: _glassPanel(
-              radius: 25,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
-                tooltip: 'Quay lại',
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: _glassPanel(
+                radius: 22,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Quay lại',
+                ),
               ),
             ),
           ),
